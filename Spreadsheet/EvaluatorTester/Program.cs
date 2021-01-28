@@ -6,7 +6,7 @@ namespace EvaluatorTester
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            Console.WriteLine("Evaluator Tester");
         }
     }
 }
