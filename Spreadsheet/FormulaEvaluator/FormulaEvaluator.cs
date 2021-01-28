@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Author:  David Clark
+// Date:    2021-01-27
+
+using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
@@ -7,7 +10,7 @@ namespace FormulaEvaluator
     /// <summary>
     /// 
     /// </summary>
-    public static class Evaluator
+    public static class FormulaEvaluator
     {
         public delegate int Lookup(String v);
 
@@ -39,11 +42,9 @@ namespace FormulaEvaluator
             // process tokens
             foreach(String token in tokens)
             {
-                char firstChar = token.ToCharArray()[0];    // used throughout the block
-                string prevOp = opStack.Peek();             // used throughout the block
 
                 // if t is only whitespace, ignore
-                if (char.IsWhiteSpace(firstChar)){
+                if (char.IsWhiteSpace( token.ToCharArray()[0] )){
                     continue;
                 }
 
@@ -57,14 +58,14 @@ namespace FormulaEvaluator
                 } catch (Exception e) { }
 
                 // check: t is a var
-                if (char.IsLetter(firstChar))
+                if (isVariable(token))
                 {
                     int tokenValue = variableEvaluator(token);
                     valueStack.Push(tokenValue);
                 }
 
                 // check: t is a + or -
-                if (token == "+" || token =="-")
+                else if (token == "+" || token =="-")
                 {
                     // If the previous operator was a + or -, apply that operation to members of the value stack.
                     addOrSubtract(valueStack, opStack);
@@ -74,40 +75,51 @@ namespace FormulaEvaluator
                 }
 
                 // check: t is a * or /
-                if (token == "*" || token == "/")
+                else if (token == "*" || token == "/")
                 {
                     opStack.Push(token);
                 }
 
                 // check: t is a left parenthesis
-                if (token == "(")
+                else if (token == "(")
                 {
                     opStack.Push(token);
                 }
 
                 // check: t is a right parenthesis
-                if (token == ")")
+                else if (token == ")")
                 {
                     // if + or - is on top of the opStack, apply the operation accordingly
                     addOrSubtract(valueStack, opStack);
 
                     // expectation: next token in the opStack should be a "("
+                    if (opStack.Peek() != "(")
+                        throw new ArgumentException("Expected '('");
                     opStack.Pop();
 
                     // if * or / is on top of the opStack, apply the operation accordingly
                     multiplyOrDivide(valueStack, opStack);
                 }
-
+                
             }
 
             // after last token is processed...
             
-            // if stack is not empty
+            // if opStack is not empty
             if(opStack.Count != 0)
             {
+                if (opStack.Count != 1)
+                    throw new ArgumentException("End of processing: Too many operators");
+                if (opStack.Peek() != "+" && opStack.Peek() != "-")
+                    throw new ArgumentException("End of processing: Last remaining operator must be '+' or '-'");
+                if (valueStack.Count != 2)
+                    throw new ArgumentException("End of processing: Value stack contains wrong number of elements");
+
                 addOrSubtract(valueStack, opStack);
-                // handle errors
             }
+
+            if (valueStack.Count != 1)
+                throw new ArgumentException("End of processing: Value stack should contain 1 element");
 
             return valueStack.Pop();
         }
@@ -123,6 +135,14 @@ namespace FormulaEvaluator
         /// <param name="opStack">The stack containing all previously encountered operators.</param>
         public static void addOrSubtract(Stack<int> valueStack, Stack<string> opStack)
         {
+            // avoid error: opStack is empty
+            if (opStack.Count == 0)
+                return;
+
+            // avoid error: valueStack has fewer than 2 items
+            if (valueStack.Count < 2)
+                throw new ArgumentException("Missing a value");
+
             if (opStack.Peek() == "+" || opStack.Peek() == "-")
             {
                 String prevOp = opStack.Pop();
@@ -146,18 +166,45 @@ namespace FormulaEvaluator
         /// <param name="opStack">The stack containing all previously encountered operators.</param>
         public static void multiplyOrDivide(Stack<int> valueStack, Stack<string> opStack)
         {
+            // avoid error: opStack is empty
+            if (opStack.Count == 0)
+                return;
+
+            // avoid error: valueStack has fewer than 2 items
+            if (valueStack.Count < 2)
+                throw new ArgumentException("Missing a value");
+
             if (opStack.Peek() == "*" || opStack.Peek() == "/")
             {
                 String prevOp = opStack.Pop();
                 int currValue = valueStack.Pop();
                 int prevValue = valueStack.Pop();
 
-                if (prevOp == "+")
+                if (prevOp == "*")
                     valueStack.Push(prevValue * currValue);
-                else
+                else if (prevOp == "/" && currValue != 0)
                     valueStack.Push(prevValue / currValue);
+                else 
+                    throw new ArgumentException("Division by 0");
+                   
+                
             }
         }
 
+        /// <summary>
+        /// Helper method for Evaluate.
+        /// Returns true if the string represents a valid variable name.
+        /// </summary>
+        /// <param name="str">A string that may or may not represent a variable name.</param>
+        /// <returns>True only if the string is a valid variable name.</returns>
+        public static Boolean isVariable(string str)
+        {
+            // TODO: better definition
+            // if the first character is a letter, that's enough
+            if (char.IsLetter(str.ToCharArray()[0]))
+                return true;
+            else
+                return false;
+        }
     }
 }
