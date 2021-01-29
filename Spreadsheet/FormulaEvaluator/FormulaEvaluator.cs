@@ -17,7 +17,7 @@ namespace FormulaEvaluator
 
 
         /// <summary>
-        /// 
+        /// Takes an expression and a delegate, returns a single integer value.
         /// </summary>
         /// <param name="exp"> The expression to be evaluated. </param>
         /// <param name="variableEvaluator"> A function that receives a variable name (a string) and returns an integer. </param>
@@ -49,19 +49,22 @@ namespace FormulaEvaluator
                 }
 
                 // check: t is an int 
-                try
+                else if (isInteger(token))
                 {
                     valueStack.Push(Int32.Parse(token));
-                    
+
                     // if * or / is on top of the opStack, apply the operation accordingly
                     multiplyOrDivide(valueStack, opStack);
-                } catch (Exception e) { }
+                }
 
                 // check: t is a var
-                if (isVariable(token))
+                else if (isVariable(token))
                 {
                     int tokenValue = variableEvaluator(token);
                     valueStack.Push(tokenValue);
+
+                    // if * or / is on top of the opStack, apply the operation accordingly
+                    multiplyOrDivide(valueStack, opStack);
                 }
 
                 // check: t is a + or -
@@ -70,8 +73,6 @@ namespace FormulaEvaluator
                     // If the previous operator was a + or -, apply that operation to members of the value stack.
                     addOrSubtract(valueStack, opStack);
                     opStack.Push(token);
-
-                    //to-do: handle errors
                 }
 
                 // check: t is a * or /
@@ -99,6 +100,12 @@ namespace FormulaEvaluator
 
                     // if * or / is on top of the opStack, apply the operation accordingly
                     multiplyOrDivide(valueStack, opStack);
+                }
+
+                // error: t is not a valid token
+                else
+                {
+                    throw new ArgumentException("Formula contains an invalid token.");
                 }
                 
             }
@@ -193,15 +200,27 @@ namespace FormulaEvaluator
 
         /// <summary>
         /// Helper method for Evaluate.
+        /// Returns true if the string represents a valid integer.
+        /// </summary>
+        /// <param name="str">A string that may or may not represent an integer.</param>
+        /// <returns>True only if the string is a valid integer, i.e. contains only values 0-9.</returns>
+        public static Boolean isInteger(string str)
+        {
+            if (Regex.IsMatch(str, "^[0-9]+$"))
+                return true;
+            else
+                return false;
+        }
+
+        /// <summary>
+        /// Helper method for Evaluate.
         /// Returns true if the string represents a valid variable name.
         /// </summary>
         /// <param name="str">A string that may or may not represent a variable name.</param>
         /// <returns>True only if the string is a valid variable name.</returns>
         public static Boolean isVariable(string str)
         {
-            // TODO: better definition
-            // if the first character is a letter, that's enough
-            if (char.IsLetter(str.ToCharArray()[0]))
+            if (Regex.IsMatch(str, "^[A-Za-z]+[0-9]+$"))
                 return true;
             else
                 return false;

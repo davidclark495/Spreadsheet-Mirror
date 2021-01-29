@@ -11,6 +11,13 @@ namespace EvaluatorUnitTester
             return 0;
         }
 
+        public int firstLetterLookup(string str)
+        {
+            char first = str.ToCharArray()[0];
+            int asciiValue = (int)first;
+            return asciiValue;
+        }
+
 
 
 
@@ -50,6 +57,48 @@ namespace EvaluatorUnitTester
         public void MixedAdditionAndSubtraction()
         {
             Assert.AreEqual(0, FormulaEvaluator.FormulaEvaluator.Evaluate("10 + 2 - 6 + 1 - 7", this.zeroLookup));
+        }
+
+        [TestMethod]
+        public void singleVar()
+        {
+            Assert.AreEqual(0, FormulaEvaluator.FormulaEvaluator.Evaluate("A7", this.zeroLookup));
+            Assert.AreEqual(0, FormulaEvaluator.FormulaEvaluator.Evaluate("AA0", this.zeroLookup));
+            Assert.AreEqual(0, FormulaEvaluator.FormulaEvaluator.Evaluate("XZ883", this.zeroLookup));
+            Assert.AreEqual(0, FormulaEvaluator.FormulaEvaluator.Evaluate("A7", this.zeroLookup));
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(System.ArgumentException))]
+        public void invalidVar()
+        {
+            FormulaEvaluator.FormulaEvaluator.Evaluate("letters", this.zeroLookup);
+        }
+
+
+        /// <summary>
+        /// Tests the regex expression used in FormulaEvaluator, does not directly reference it though.
+        /// </summary>
+        [TestMethod]
+        public void VariableIdentifierRegex()
+        {
+            string[] goodVariables = { "A4", "AaR42901", "Z0" };
+            string[] badVariables  = { "4A", "1234", "X4randomcrap3490^3#2", "X4!", "(A2)", "", " " };
+
+            foreach(string goodVar in goodVariables)
+            {
+                bool goodVarIsValid = System.Text.RegularExpressions.Regex.IsMatch(goodVar, "^[A-Za-z]+[0-9]+$");
+                Assert.IsTrue(goodVarIsValid);
+            }
+
+            foreach (string badVar in badVariables)
+            {
+                bool badVarIsValid = System.Text.RegularExpressions.Regex.IsMatch(badVar, "^[A-Za-z]+[0-9]+$");
+                Assert.IsFalse(badVarIsValid);
+            }
+
+
+            
         }
     }
 }
