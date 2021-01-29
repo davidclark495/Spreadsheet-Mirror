@@ -1,5 +1,5 @@
-﻿// Author:  David Clark
-// Date:    2021-01-27
+﻿// Author:  David Clark, Spring 2021
+// University of Utah
 
 using System;
 using System.Collections.Generic;
@@ -8,12 +8,11 @@ using System.Text.RegularExpressions;
 namespace FormulaEvaluator
 {
     /// <summary>
-    /// 
+    /// A class with methods for evaluating simple arithmetic expressions, with or without variables.
     /// </summary>
-    public static class FormulaEvaluator
+    public static class Evaluator
     {
         public delegate int Lookup(String v);
-
 
 
         /// <summary>
@@ -30,9 +29,9 @@ namespace FormulaEvaluator
 
             // split string into tokens
             string[] tokens = Regex.Split(exp, "(\\()|(\\))|(-)|(\\+)|(\\*)|(/)");
-            
+
             // trim tokens
-            for(int i = 0; i < tokens.Length; i++)
+            for (int i = 0; i < tokens.Length; i++)
             {
                 tokens[i] = tokens[i].Trim();
                 //to-do: check for empty strings
@@ -40,11 +39,11 @@ namespace FormulaEvaluator
             }
 
             // process tokens
-            foreach(String token in tokens)
+            foreach (String token in tokens)
             {
-
                 // if t is only whitespace, ignore
-                if (token == "" || char.IsWhiteSpace( token.ToCharArray()[0] )){
+                if (token == "" || char.IsWhiteSpace(token.ToCharArray()[0]))
+                {
                     continue;
                 }
 
@@ -60,15 +59,14 @@ namespace FormulaEvaluator
                 // check: t is a var
                 else if (isVariable(token))
                 {
-                    int tokenValue = variableEvaluator(token);
-                    valueStack.Push(tokenValue);
+                    valueStack.Push( variableEvaluator(token) );
 
                     // if * or / is on top of the opStack, apply the operation accordingly
                     multiplyOrDivide(valueStack, opStack);
                 }
 
                 // check: t is a + or -
-                else if (token == "+" || token =="-")
+                else if (token == "+" || token == "-")
                 {
                     // If the previous operator was a + or -, apply that operation to members of the value stack.
                     addOrSubtract(valueStack, opStack);
@@ -93,7 +91,7 @@ namespace FormulaEvaluator
                     // if + or - is on top of the opStack, apply the operation accordingly
                     addOrSubtract(valueStack, opStack);
 
-                    // expectation: next token in the opStack should be a "("
+                    // expectation: next token in the opStack should be a "(", should be discarded
                     if (opStack.Count == 0 || opStack.Peek() != "(")
                         throw new ArgumentException("Expected '('");
                     opStack.Pop();
@@ -105,15 +103,15 @@ namespace FormulaEvaluator
                 // error: t is not a valid token
                 else
                 {
-                    throw new ArgumentException("Formula contains an invalid token.");
+                    throw new ArgumentException("Formula contains an invalid token");
                 }
-                
+
             }
 
             // after last token is processed...
-            
+
             // if opStack is not empty
-            if(opStack.Count != 0)
+            if (opStack.Count != 0)
             {
                 if (opStack.Count != 1)
                     throw new ArgumentException("End of processing: Too many operators");
@@ -125,13 +123,14 @@ namespace FormulaEvaluator
                 addOrSubtract(valueStack, opStack);
             }
 
+            // if valueStack doesn't contain a single result
             if (valueStack.Count != 1)
                 throw new ArgumentException("End of processing: Value stack should contain 1 element");
 
             return valueStack.Pop();
         }
 
-        
+
         /// <summary>
         /// Helper method for Evaluate.
         /// Checks to see if the most recently pushed operator is + or -.
@@ -142,17 +141,17 @@ namespace FormulaEvaluator
         /// <param name="opStack">The stack containing all previously encountered operators.</param>
         public static void addOrSubtract(Stack<int> valueStack, Stack<string> opStack)
         {
-            // avoid error: opStack is empty
+            // can't peek if opStack is empty
             if (opStack.Count == 0)
                 return;
 
 
             if (opStack.Peek() == "+" || opStack.Peek() == "-")
             {
-                // avoid error: valueStack has fewer than 2 items
+                // error: valueStack has fewer than 2 items
                 if (valueStack.Count < 2)
                     throw new ArgumentException("Missing a value");
-            
+
                 String prevOp = opStack.Pop();
                 int currValue = valueStack.Pop();
                 int prevValue = valueStack.Pop();
@@ -174,7 +173,7 @@ namespace FormulaEvaluator
         /// <param name="opStack">The stack containing all previously encountered operators.</param>
         public static void multiplyOrDivide(Stack<int> valueStack, Stack<string> opStack)
         {
-            // avoid error: opStack is empty
+            // can't peek if opStack is empty
             if (opStack.Count == 0)
                 return;
 
@@ -193,10 +192,10 @@ namespace FormulaEvaluator
                     valueStack.Push(prevValue * currValue);
                 else if (prevOp == "/" && currValue != 0)
                     valueStack.Push(prevValue / currValue);
-                else 
+                else
                     throw new ArgumentException("Division by 0");
-                   
-                
+
+
             }
         }
 
@@ -208,10 +207,7 @@ namespace FormulaEvaluator
         /// <returns>True only if the string is a valid integer, i.e. contains only values 0-9.</returns>
         public static Boolean isInteger(string str)
         {
-            if (Regex.IsMatch(str, "^[0-9]+$"))
-                return true;
-            else
-                return false;
+            return Regex.IsMatch(str, "^[0-9]+$");
         }
 
         /// <summary>
@@ -222,10 +218,7 @@ namespace FormulaEvaluator
         /// <returns>True only if the string is a valid variable name.</returns>
         public static Boolean isVariable(string str)
         {
-            if (Regex.IsMatch(str, "^[A-Za-z]+[0-9]+$"))
-                return true;
-            else
-                return false;
+            return Regex.IsMatch(str, "^[A-Za-z]+[0-9]+$");
         }
     }
 }
