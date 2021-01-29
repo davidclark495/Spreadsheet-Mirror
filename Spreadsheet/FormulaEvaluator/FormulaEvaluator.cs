@@ -44,7 +44,7 @@ namespace FormulaEvaluator
             {
 
                 // if t is only whitespace, ignore
-                if (char.IsWhiteSpace( token.ToCharArray()[0] )){
+                if (token == "" || char.IsWhiteSpace( token.ToCharArray()[0] )){
                     continue;
                 }
 
@@ -94,7 +94,7 @@ namespace FormulaEvaluator
                     addOrSubtract(valueStack, opStack);
 
                     // expectation: next token in the opStack should be a "("
-                    if (opStack.Peek() != "(")
+                    if (opStack.Count == 0 || opStack.Peek() != "(")
                         throw new ArgumentException("Expected '('");
                     opStack.Pop();
 
@@ -146,12 +146,13 @@ namespace FormulaEvaluator
             if (opStack.Count == 0)
                 return;
 
-            // avoid error: valueStack has fewer than 2 items
-            if (valueStack.Count < 2)
-                throw new ArgumentException("Missing a value");
 
             if (opStack.Peek() == "+" || opStack.Peek() == "-")
             {
+                // avoid error: valueStack has fewer than 2 items
+                if (valueStack.Count < 2)
+                    throw new ArgumentException("Missing a value");
+            
                 String prevOp = opStack.Pop();
                 int currValue = valueStack.Pop();
                 int prevValue = valueStack.Pop();
@@ -177,12 +178,13 @@ namespace FormulaEvaluator
             if (opStack.Count == 0)
                 return;
 
-            // avoid error: valueStack has fewer than 2 items
-            if (valueStack.Count < 2)
-                throw new ArgumentException("Missing a value");
 
             if (opStack.Peek() == "*" || opStack.Peek() == "/")
             {
+                // avoid error: valueStack has fewer than 2 items
+                if (valueStack.Count < 2)
+                    throw new ArgumentException("Missing a value");
+
                 String prevOp = opStack.Pop();
                 int currValue = valueStack.Pop();
                 int prevValue = valueStack.Pop();
