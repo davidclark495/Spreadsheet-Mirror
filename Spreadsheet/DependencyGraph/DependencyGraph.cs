@@ -3,6 +3,7 @@
 // Version 1.2 - Daniel Kopta 
 //               (Clarified meaning of dependent and dependee.)
 //               (Clarified names in solution/project structure.)
+// Implementation written by David Clark, February 2021
 
 using System;
 using System.Collections.Generic;
@@ -136,13 +137,17 @@ namespace SpreadsheetUtilities
         /// <param name="t"> t cannot be evaluated until s is</param>        /// 
         public void AddDependency(string s, string t)
         {
-            // update list of dependents, key is s
+            // if the dependency already exists, return without doing anything
+            if (HasDependents(s) && GetDependents(s).Contains(t))
+                return;
+            
+            // update list of dependents
             if (HasDependents(s))
-                dependentsDict[s].Add(t);
+               dependentsDict[s].Add(t);
             else
                 dependentsDict.Add(s, new HashSet<string>( new string[]{ t } ));
 
-            // update list of dependees, key is t
+            // update list of dependees
             if (HasDependees(t))
                 dependeesDict[t].Add(s);
             else
@@ -159,14 +164,12 @@ namespace SpreadsheetUtilities
         /// <param name="t"></param>
         public void RemoveDependency(string s, string t)
         {
-            // update list of dependents, key is s
-            if (HasDependents(s))
-                dependentsDict[s].Remove(t);
+            // if the dependency doesn't exist, return without doing anything
+            if (!HasDependents(s) || !HasDependees(t))
+                return;
 
-            // update list of dependees, key is t
-            if (HasDependees(t))
-                dependeesDict[t].Remove(s);
-
+            dependentsDict[s].Remove(t);
+            dependeesDict[t].Remove(s);
             p_size--;
         }
 
@@ -207,7 +210,7 @@ namespace SpreadsheetUtilities
 
             // add new dependees
             foreach (string newDep in newDependees)
-                this.RemoveDependency(newDep, s);
+                this.AddDependency(newDep, s);
         }
 
     }
