@@ -80,7 +80,13 @@ namespace SpreadsheetUtilities
         /// </summary>
         public int this[string s]
         {
-            get { return dependeesDict[s].Count; }
+            get 
+            {
+                if (!HasDependees(s))
+                    return 0;
+
+                return dependeesDict[s].Count; 
+            }
         }
 
 
@@ -137,9 +143,14 @@ namespace SpreadsheetUtilities
         /// <param name="t"> t cannot be evaluated until s is</param>        /// 
         public void AddDependency(string s, string t)
         {
+            // catch null inputs
+            if (s == null || t == null)
+                throw new ArgumentException("Null values not accepted.");
+
             // if the dependency already exists, return without doing anything
-            if (HasDependents(s) && GetDependents(s).Contains(t))
+            if (DependencyExists(s,t))
                 return;
+
             
             // update list of dependents
             if (HasDependents(s))
@@ -153,6 +164,7 @@ namespace SpreadsheetUtilities
             else
                 dependeesDict.Add(t, new HashSet<string>( new string[] { s } ));
 
+            // update size
             p_size++;
         }
 
@@ -164,13 +176,24 @@ namespace SpreadsheetUtilities
         /// <param name="t"></param>
         public void RemoveDependency(string s, string t)
         {
+            // catch null inputs
+            if (s == null || t == null)
+                throw new ArgumentException("Null values not accepted.");
+
             // if the dependency doesn't exist, return without doing anything
-            if (!HasDependents(s) || !HasDependees(t))
+            if (!DependencyExists(s, t))
                 return;
+
 
             dependentsDict[s].Remove(t);
             dependeesDict[t].Remove(s);
             p_size--;
+
+            // clean up dictionaries, i.e. remove references to s or t once they lose all relationships
+            if (dependentsDict[s].Count == 0)
+                dependentsDict.Remove(s);
+            if (dependeesDict[t].Count == 0)
+                dependeesDict.Remove(t);
         }
 
 
@@ -180,11 +203,13 @@ namespace SpreadsheetUtilities
         /// </summary>
         public void ReplaceDependents(string s, IEnumerable<string> newDependents)
         {
-            if (!HasDependents(s))
-                return;
+            // catch null inputs, throw exception
+            if (s == null || newDependents == null)
+                throw new ArgumentException("Null values not accepted.");
+
 
             // remove old dependents
-            HashSet<string> oldDependents = new HashSet<string>(dependentsDict[s]);
+            HashSet<string> oldDependents = new HashSet<string>(GetDependents(s));
             foreach (string oldDep in oldDependents)
                 this.RemoveDependency(s, oldDep);
 
@@ -200,17 +225,30 @@ namespace SpreadsheetUtilities
         /// </summary>
         public void ReplaceDependees(string s, IEnumerable<string> newDependees)
         {
-            if (!HasDependees(s))
-                return;
+            // catch null inputs, throw exception
+            if (s == null || newDependees == null)
+                throw new ArgumentException("Null values not accepted.");
+
 
             // remove old dependees
-            HashSet<string> oldDependees = new HashSet<string>(dependeesDict[s]);
+            HashSet<string> oldDependees = new HashSet<string>(GetDependees(s));
             foreach (string oldDep in oldDependees)
                 this.RemoveDependency(oldDep, s);
 
             // add new dependees
             foreach (string newDep in newDependees)
                 this.AddDependency(newDep, s);
+        }
+
+        /// <summary>
+        /// Returns true if (s, t) is an ordered pair in the graph
+        /// </summary>
+        /// <param name="s">the dependee</param>
+        /// <param name="t">the dependent</param>
+        /// <returns></returns>
+        private bool DependencyExists(string s, string t)
+        {
+            return GetDependents(s).Contains(t) && GetDependees(t).Contains(s);
         }
 
     }

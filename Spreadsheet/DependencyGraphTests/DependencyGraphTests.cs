@@ -1,3 +1,8 @@
+// Template provided by CS 3500 instructor / TA's
+// Author: David Clark 
+// February 2021
+
+
 using System;
 using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -73,6 +78,78 @@ namespace DevelopmentTests
             t.ReplaceDependees("y", new HashSet<string>());
         }
 
+        /// <summary>
+        ///Replace should be useable on a node without previous relationships, should establish new relationships
+        ///</summary>
+        [TestMethod()]
+        public void ReplaceDependentsEmptyListTest()
+        {
+            DependencyGraph t = new DependencyGraph();
+
+            t.ReplaceDependents("a", new HashSet<string>( new string[] { "b", "c" }));
+
+            IEnumerator<string> e = t.GetDependents("a").GetEnumerator();
+            Assert.IsTrue(e.MoveNext());
+            String s1 = e.Current;
+            Assert.IsTrue(e.MoveNext());
+            String s2 = e.Current;
+            Assert.IsFalse(e.MoveNext());
+            Assert.IsTrue(((s1 == "b") && (s2 == "c")) || ((s1 == "c") && (s2 == "b")));
+        }
+
+        /// <summary>
+        ///Replace should be useable on a node without previous relationships, should establish new relationships
+        ///</summary>
+        [TestMethod()]
+        public void ReplaceDependeesEmptyListTest()
+        {
+            DependencyGraph t = new DependencyGraph();
+
+            t.ReplaceDependees("z", new HashSet<string>(new string[] { "x", "y" }));
+          
+            IEnumerator<string> e = t.GetDependees("z").GetEnumerator();
+            Assert.IsTrue(e.MoveNext());
+            String s1 = e.Current;
+            Assert.IsTrue(e.MoveNext());
+            String s2 = e.Current;
+            Assert.IsFalse(e.MoveNext());
+            Assert.IsTrue(((s1 == "x") && (s2 == "y")) || ((s1 == "y") && (s2 == "x")));
+
+        }
+
+        /// <summary>
+        ///Removing a non-existant dependency should do nothing
+        ///</summary>
+        [TestMethod()]
+        public void ImproperRemoveTest()
+        {
+            DependencyGraph t = new DependencyGraph();
+            t.AddDependency("a", "b");
+            t.AddDependency("c", "d");
+
+            t.RemoveDependency("a", "z"); // dependent doesn't exist
+            t.RemoveDependency("q", "b"); // dependee doesn't exist
+            t.RemoveDependency("x", "y"); // nodes don't exist at all
+            t.RemoveDependency("b", "a"); // nodes exist, but not in the correct dictionaries
+            t.RemoveDependency("a", "d"); // nodes exist, but no relationship exists between them
+
+            Assert.AreEqual(2, t.Size);
+        }
+
+        /// <summary>
+        ///Adding the same ordered pair repeatedly shouldn't affect graph size
+        ///</summary>
+        [TestMethod()]
+        public void AddDuplicateTest()
+        {
+            DependencyGraph t = new DependencyGraph();
+            
+            t.AddDependency("a", "b");
+            Assert.AreEqual(1, t.Size);
+
+            t.AddDependency("a", "b");
+            Assert.AreEqual(1, t.Size); // size remains the same
+        }
 
 
         ///<summary>
@@ -103,6 +180,24 @@ namespace DevelopmentTests
             t.AddDependency("c", "b");
             t.AddDependency("b", "d");
             Assert.AreEqual(4, t.Size);
+        }
+
+        /// <summary>
+        ///The graph knows the correct size of its nodes' "dependees" lists.
+        ///</summary>
+        [TestMethod()]
+        public void DependeesIndexerTest()
+        {
+            DependencyGraph t = new DependencyGraph();
+            t.AddDependency("a", "b");
+            t.AddDependency("a", "c");
+            t.AddDependency("c", "b");
+            t.AddDependency("b", "d");
+
+            Assert.AreEqual(0, t["a"]);
+            Assert.AreEqual(2, t["b"]);
+            Assert.AreEqual(1, t["c"]);
+            Assert.AreEqual(1, t["d"]);
         }
 
 
@@ -181,6 +276,27 @@ namespace DevelopmentTests
             Assert.IsFalse(e.MoveNext());
         }
 
+        /// <summary>
+        ///Graph should throw an argument exception when passed null values
+        ///</summary>
+        [TestMethod()]
+        [ExpectedException(typeof(ArgumentException))]
+        public void AddNullTest()
+        {
+            DependencyGraph t = new DependencyGraph();
+            t.AddDependency(null, null);
+        }
+
+        /// <summary>
+        ///Graph should throw an argument exception when passed null values
+        ///</summary>
+        [TestMethod()]
+        [ExpectedException(typeof(ArgumentException))]
+        public void RemoveNullTest()
+        {
+            DependencyGraph t = new DependencyGraph();
+            t.RemoveDependency(null, null);
+        }
 
 
         /// <summary>
