@@ -200,6 +200,43 @@ namespace DevelopmentTests
             Assert.AreEqual(1, t["d"]);
         }
 
+        /// <summary>
+        /// The graph should correctly identify when its nodes have certain relationships
+        /// </summary>
+        [TestMethod()]
+        public void HasDependeesTest()
+        {
+            DependencyGraph t = new DependencyGraph();
+            t.AddDependency("a", "b");
+            t.AddDependency("a", "c");
+            t.AddDependency("c", "b");
+            t.AddDependency("b", "d");
+
+            Assert.IsFalse(t.HasDependees("a"));
+            Assert.IsTrue(t.HasDependees("b"));
+            Assert.IsTrue(t.HasDependees("c"));
+            Assert.IsTrue(t.HasDependees("d"));
+            Assert.IsFalse(t.HasDependees("z"));
+        }
+
+        /// <summary>
+        /// The graph should correctly identify when its nodes have certain relationships
+        /// </summary>
+        [TestMethod()]
+        public void HasDependentsTest()
+        {
+            DependencyGraph t = new DependencyGraph();
+            t.AddDependency("a", "b");
+            t.AddDependency("a", "c");
+            t.AddDependency("c", "b");
+            t.AddDependency("b", "d");
+
+            Assert.IsTrue(t.HasDependents("a"));
+            Assert.IsTrue(t.HasDependents("b"));
+            Assert.IsTrue(t.HasDependents("c"));
+            Assert.IsFalse(t.HasDependents("d"));
+            Assert.IsFalse(t.HasDependents("z"));
+        }
 
         /// <summary>
         ///Non-empty graph contains something
@@ -296,6 +333,28 @@ namespace DevelopmentTests
         {
             DependencyGraph t = new DependencyGraph();
             t.RemoveDependency(null, null);
+        }
+
+        /// <summary>
+        ///Graph should throw an argument exception when passed null values
+        ///</summary>
+        [TestMethod()]
+        [ExpectedException(typeof(ArgumentException))]
+        public void ReplaceDependeesNullTest()
+        {
+            DependencyGraph t = new DependencyGraph();
+            t.ReplaceDependees(null, null);
+        }
+
+        /// <summary>
+        ///Graph should throw an argument exception when passed null values
+        ///</summary>
+        [TestMethod()]
+        [ExpectedException(typeof(ArgumentException))]
+        public void ReplaceDependentsNullTest()
+        {
+            DependencyGraph t = new DependencyGraph();
+            t.ReplaceDependents(null, null);
         }
 
 

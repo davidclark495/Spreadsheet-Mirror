@@ -45,9 +45,9 @@ namespace SpreadsheetUtilities
         // the number of ordered pairs in the graph
         private int p_size;
 
-        // a dictionary storing lists of dependents for each applicable node
+        // a dictionary storing hash sets of dependents for each applicable node
         private Dictionary<string, HashSet<string>> dependentsDict;
-        // a dictionary storing lists of dependees for each applicable node
+        // a dictionary storing hash sets of dependees for each applicable node
         private Dictionary<string, HashSet<string>> dependeesDict;
 
 
