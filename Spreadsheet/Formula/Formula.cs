@@ -24,7 +24,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace SpreadsheetUtilities
+namespace Formula
 {
     /// <summary>
     /// Represents formulas written in standard infix notation using standard precedence

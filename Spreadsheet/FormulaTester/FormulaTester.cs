@@ -17,16 +17,16 @@ namespace FormulaTester
         public void EvaluateDivByZero()
         {
             
-            Assert.IsTrue(new Formula("1 / 0").Evaluate(zeroLookup) is FormulaError);
+            Assert.IsTrue(new Formula.Formula("1 / 0").Evaluate(zeroLookup) is FormulaError);
         }
 
         [TestMethod]
         public void EvaluateInts()
         {
-            Assert.AreEqual(2, new Formula("1 + 1").Evaluate(zeroLookup));
-            Assert.AreEqual(8, new Formula("( 1 + 3 ) * 2").Evaluate(zeroLookup));
-            Assert.AreEqual(5, new Formula("25 / 5 + 3 - 3").Evaluate(zeroLookup));
-            Assert.AreEqual(2, new Formula("1 + 1").Evaluate(zeroLookup));
+            Assert.AreEqual(2, new Formula.Formula("1 + 1").Evaluate(zeroLookup));
+            Assert.AreEqual(8, new Formula.Formula("( 1 + 3 ) * 2").Evaluate(zeroLookup));
+            Assert.AreEqual(5, new Formula.Formula("25 / 5 + 3 - 3").Evaluate(zeroLookup));
+            Assert.AreEqual(2, new Formula.Formula("1 + 1").Evaluate(zeroLookup));
         }
     }
 }
