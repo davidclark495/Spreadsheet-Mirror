@@ -46,6 +46,11 @@ namespace SpreadsheetUtilities
     /// </summary>
     public class Formula
     {
+        private string formula;
+        private Func<string, string> normalize;
+        private Func<string, bool> isValid;
+
+
         /// <summary>
         /// Creates a Formula from a string that consists of an infix expression written as
         /// described in the class comment.  If the expression is syntactically invalid,
@@ -83,6 +88,10 @@ namespace SpreadsheetUtilities
         /// </summary>
         public Formula(String formula, Func<string, string> normalize, Func<string, bool> isValid)
         {
+            // TODO: implement checks, detect invalid formulas
+            this.formula = formula;
+            this.normalize = normalize;
+            this.isValid = isValid;
         }
 
         /// <summary>
@@ -108,7 +117,168 @@ namespace SpreadsheetUtilities
         /// </summary>
         public object Evaluate(Func<string, double> lookup)
         {
-            return null;
+            // init. 2 stacks
+            Stack<String> opStack = new Stack<String>();
+            Stack<double> valueStack = new Stack<double>();
+
+            // process tokens
+            foreach (String token in Formula.GetTokens(this.formula))
+            {
+                // check: t is a double 
+                if (Double.TryParse(token, out double result))
+                {
+                    valueStack.Push(result);
+
+                    // if * or / is on top of the opStack, apply the operation accordingly, return error if necessary
+                    multiplyOrDivide(valueStack, opStack, out bool divisionByZeroOccurred);
+                    if (divisionByZeroOccurred)
+                        return DivisionByZeroError();
+                }
+
+                // check: t is a var
+                else if (isVariable(token))
+                {
+                    // if token cannot be evaluated, return an error
+                    try
+                    {
+                        double value = lookup(normalize(token));
+                        valueStack.Push(value);
+                    } catch (ArgumentException e)
+                    {
+                        return new FormulaError("Unknown Variable: your Lookup function couldn't find a reference to " + normalize(token) + ".");
+                    }
+
+                    // if * or / is on top of the opStack, apply the operation accordingly, return error if necessary
+                    multiplyOrDivide(valueStack, opStack, out bool divisionByZeroOccurred);
+                    if (divisionByZeroOccurred)
+                        return DivisionByZeroError();
+                }
+
+                // check: t is a + or -
+                else if (token == "+" || token == "-")
+                {
+                    // If the previous operator was a + or -, apply that operation to members of the value stack.
+                    addOrSubtract(valueStack, opStack);
+                    opStack.Push(token);
+                }
+
+                // check: t is a * or /
+                else if (token == "*" || token == "/")
+                {
+                    opStack.Push(token);
+                }
+
+                // check: t is a left parenthesis
+                else if (token == "(")
+                {
+                    opStack.Push(token);
+                }
+
+                // check: t is a right parenthesis
+                else if (token == ")")
+                {
+                    // if + or - is on top of the opStack, apply the operation accordingly
+                    addOrSubtract(valueStack, opStack);
+
+                    // next token in the opStack should be a "(", should be discarded
+                    opStack.Pop();
+
+                    // if * or / is on top of the opStack, apply the operation accordingly, return error if necessary
+                    multiplyOrDivide(valueStack, opStack, out bool divisionByZeroOccurred);
+                    if (divisionByZeroOccurred)
+                        return DivisionByZeroError();
+                }
+            }
+
+            // after last token is processed...
+
+            // if opStack is not empty
+            if (opStack.Count != 0)
+            {
+                addOrSubtract(valueStack, opStack);
+            }
+
+            return valueStack.Pop();
+        }
+
+        /// <summary>
+        /// Helper method for Evaluate.
+        /// Checks to see if the most recently pushed operator is + or -.
+        /// If so, the operation is applied to the last two items in the value stack.
+        /// The result is pushed to the value stack.
+        /// </summary>
+        /// <param name="valueStack">The stack containing all previously encountered values.</param>
+        /// <param name="opStack">The stack containing all previously encountered operators.</param>
+        private void addOrSubtract(Stack<double> valueStack, Stack<string> opStack)
+        {
+            if(opStack.IsOnTop("+") || opStack.IsOnTop("-")) 
+            {
+                String prevOp = opStack.Pop();
+                double currValue = valueStack.Pop();
+                double prevValue = valueStack.Pop();
+
+                if (prevOp == "+")
+                    valueStack.Push(prevValue + currValue);
+                else
+                    valueStack.Push(prevValue - currValue);
+            }
+        }
+
+        /// <summary>
+        /// Helper method for Evaluate.
+        /// Checks to see if the most recently pushed operator is * or /.
+        /// If so, the operation is applied to the last two items in the value stack.
+        /// The result is pushed to the value stack.
+        /// </summary>
+        /// <param name="valueStack">The stack containing all previously encountered values.</param>
+        /// <param name="opStack">The stack containing all previously encountered operators.</param>
+        /// <param name="divisionByZeroOccurred">True only if the operation could not be completed because of a Divide By Zero error</param>
+        private void multiplyOrDivide(Stack<double> valueStack, Stack<string> opStack, out bool divisionByZeroOccurred)
+        {
+            if (opStack.IsOnTop("*") || opStack.IsOnTop("/"))
+            {
+                String prevOp = opStack.Pop();
+                double currValue = valueStack.Pop();
+                double prevValue = valueStack.Pop();
+
+                if (prevOp == "*")
+                    valueStack.Push(prevValue * currValue);
+                else if (prevOp == "/" && currValue != 0)
+                    valueStack.Push(prevValue / currValue);
+                else
+                    divisionByZeroOccurred = true;
+            }
+            divisionByZeroOccurred = false;
+        }
+
+        /// <summary>
+        /// Helper method for Evaluate.
+        /// Returns true if the string represents a valid variable name.
+        /// </summary>
+        /// <param name="str">A string that may or may not represent a variable name.</param>
+        /// <returns>True only if the string is a valid variable name.</returns>
+        private Boolean isVariable(string str)
+        {
+            // pattern borrowed from GetTokens() method
+            String basicVarPattern = @"[a-zA-Z_](?: [a-zA-Z_]|\d)*";
+
+            // true if str meets the general criteria for a variable 
+            // i.e. starts with a letter or an underscore, then contains letters/numbers/underscores
+            bool isBasicVar = Regex.IsMatch(normalize(str), basicVarPattern);
+
+            // true if str meets this Formula's specific Validator requirements
+            bool passesValidator = isValid(normalize(str));
+
+            return isBasicVar && passesValidator;
+        }
+
+        /// <summary>
+        /// Helper for Evaluate.
+        /// </summary>
+        /// <returns>Returns a Formula Error to be used when division by zero occurs.</returns>
+        private FormulaError DivisionByZeroError()
+        {
+            return new FormulaError("Division By Zero error. Try changing your formula, or redefining certain variables.");
         }
 
         /// <summary>
@@ -263,5 +433,24 @@ namespace SpreadsheetUtilities
         /// </summary>
         public string Reason { get; private set; }
     }
+
+    /// <summary>
+    /// Class containing useful extensions, primarily used by Evaluate() and its helper methods
+    /// </summary>
+    static class StackExtensions{
+
+        /// <summary>
+        /// Returns true if the next on item on the stack is "item."
+        /// </summary>
+        /// <typeparam name="T">The type of the stack and expected item.</typeparam>
+        /// <param name="stack">A stack of type T</param>
+        /// <param name="item">The item of interest that might be on the stack</param>
+        /// <returns></returns>
+        public static bool IsOnTop<T>(this Stack<T> stack, T item) 
+        {
+            return stack.Count > 0 && stack.Peek().Equals(item);
+        }
+    }
+
 }
 
