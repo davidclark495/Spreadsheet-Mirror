@@ -28,7 +28,11 @@ namespace FormulaTestsNamespace
         [TestMethod]
         public void Constructor_Basic()
         {
-            Formula form = new Formula("( 12 + 3 ) / 5 * A5");
+            // needs more test cases
+            Formula form;
+            form = new Formula("( 12 + 3 ) / 5 * A5");
+            form = new Formula(" 7 - (2 * 0)");
+            form = new Formula("6 / x + ( ( y ) )");
         }
 
         [TestMethod]
@@ -256,10 +260,12 @@ namespace FormulaTestsNamespace
             Formula form1 = new Formula("5 + 5");
             Formula form1WithSpaces = new Formula(" 5 +    5 ");
             Formula form2 = new Formula("3 * 6");
+            Object obj = new object();
 
             Assert.IsTrue(form1.Equals(form1));
             Assert.IsTrue(form1.Equals(form1WithSpaces));
             Assert.IsFalse(form1.Equals(form2));
+            Assert.IsFalse(form1.Equals(obj));
         }
 
 
