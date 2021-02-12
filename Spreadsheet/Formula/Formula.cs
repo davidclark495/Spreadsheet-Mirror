@@ -24,7 +24,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Formula
+namespace SpreadsheetUtilities
 {
     /// <summary>
     /// Represents formulas written in standard infix notation using standard precedence
@@ -46,7 +46,7 @@ namespace Formula
     /// </summary>
     public class Formula
     {
-        private string formula;
+        private string formulaStr;
         private Func<string, string> normalize;
         private Func<string, bool> isValid;
 
@@ -89,7 +89,7 @@ namespace Formula
         public Formula(String formula, Func<string, string> normalize, Func<string, bool> isValid)
         {
             // TODO: implement checks, detect invalid formulas
-            this.formula = formula;
+            this.formulaStr = formula;
             this.normalize = normalize;
             this.isValid = isValid;
         }
@@ -122,7 +122,7 @@ namespace Formula
             Stack<double> valueStack = new Stack<double>();
 
             // process tokens
-            foreach (String token in Formula.GetTokens(this.formula))
+            foreach (String token in Formula.GetTokens(this.formulaStr))
             {
                 // check: t is a double 
                 if (Double.TryParse(token, out double result))
@@ -143,7 +143,8 @@ namespace Formula
                     {
                         double value = lookup(normalize(token));
                         valueStack.Push(value);
-                    } catch (ArgumentException e)
+                    }
+                    catch (ArgumentException e)
                     {
                         return new FormulaError("Unknown Variable: your Lookup function couldn't find a reference to " + normalize(token) + ".");
                     }
@@ -211,7 +212,7 @@ namespace Formula
         /// <param name="opStack">The stack containing all previously encountered operators.</param>
         private void addOrSubtract(Stack<double> valueStack, Stack<string> opStack)
         {
-            if(opStack.IsOnTop("+") || opStack.IsOnTop("-")) 
+            if (opStack.IsOnTop("+") || opStack.IsOnTop("-"))
             {
                 String prevOp = opStack.Pop();
                 double currValue = valueStack.Pop();
@@ -252,7 +253,7 @@ namespace Formula
         }
 
         /// <summary>
-        /// Helper method for Evaluate.
+        /// Helper method for Evaluate and GetVariables.
         /// Returns true if the string represents a valid variable name.
         /// </summary>
         /// <param name="str">A string that may or may not represent a variable name.</param>
@@ -294,7 +295,16 @@ namespace Formula
         /// </summary>
         public IEnumerable<String> GetVariables()
         {
-            return null;
+            // a set containing each variable (without duplicates)
+            HashSet<string> distinctVariables = new HashSet<string>();
+
+            foreach(string token in Formula.GetTokens(this.formulaStr))
+            {
+                if (isVariable(token))
+                    distinctVariables.Add(token);
+            }
+
+            return distinctVariables;
         }
 
         /// <summary>
@@ -309,7 +319,7 @@ namespace Formula
         /// </summary>
         public override string ToString()
         {
-            return null;
+            return formulaStr;
         }
 
         /// <summary>
@@ -334,7 +344,14 @@ namespace Formula
         /// </summary>
         public override bool Equals(object obj)
         {
-            return false;
+            // if object is null, return false
+            if (obj == null)
+                return false;
+            // if object is not a formula, return false
+            if (!(obj is Formula))
+                return false;
+
+            return this.GetHashCode() == obj.GetHashCode();
         }
 
         /// <summary>
@@ -344,7 +361,10 @@ namespace Formula
         /// </summary>
         public static bool operator ==(Formula f1, Formula f2)
         {
-            return false;
+            if (ReferenceEquals(f1, null))
+                return ReferenceEquals(f2, null);
+
+            return f1.Equals(f2);
         }
 
         /// <summary>
@@ -354,7 +374,7 @@ namespace Formula
         /// </summary>
         public static bool operator !=(Formula f1, Formula f2)
         {
-            return false;
+            return !f1.Equals(f2);
         }
 
         /// <summary>
@@ -364,7 +384,7 @@ namespace Formula
         /// </summary>
         public override int GetHashCode()
         {
-            return 0;
+            return this.ToString().GetHashCode();
         }
 
         /// <summary>
@@ -435,9 +455,11 @@ namespace Formula
     }
 
     /// <summary>
-    /// Class containing useful extensions, primarily used by Evaluate() and its helper methods
+    /// Class containing useful extensions for the Stack class. 
+    /// Used by Evaluate() and its helper methods
     /// </summary>
-    static class StackExtensions{
+    static class StackExtensions
+    {
 
         /// <summary>
         /// Returns true if the next on item on the stack is "item."
@@ -446,7 +468,7 @@ namespace Formula
         /// <param name="stack">A stack of type T</param>
         /// <param name="item">The item of interest that might be on the stack</param>
         /// <returns></returns>
-        public static bool IsOnTop<T>(this Stack<T> stack, T item) 
+        public static bool IsOnTop<T>(this Stack<T> stack, T item)
         {
             return stack.Count > 0 && stack.Peek().Equals(item);
         }
