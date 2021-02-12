@@ -7,10 +7,10 @@ using SpreadsheetUtilities;
 using System;
 using System.Collections.Generic;
 
-namespace FormulaTester
+namespace FormulaTestsNamespace
 {
     [TestClass]
-    public class FormulaTester
+    public class FormulaTests
     {
         // This is a Lookup delegate that will give any variable the value 0.
         private Func<string, double> zeroLookup = str => 0.0;
