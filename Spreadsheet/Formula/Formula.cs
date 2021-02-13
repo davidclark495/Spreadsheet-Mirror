@@ -19,6 +19,7 @@
 
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -49,6 +50,9 @@ namespace SpreadsheetUtilities
         private string formulaStr;
         private Func<string, string> normalize;
         private Func<string, bool> isValid;
+
+        private IEnumerable<string> uniqueVariables;
+
 
 
         /// <summary>
@@ -92,33 +96,75 @@ namespace SpreadsheetUtilities
             this.normalize = normalize;
             this.isValid = isValid;
 
-            // initialize backing-string
-            this.formulaStr = "";
+            // set backing-string to a standardized version of the provided formula
+            // (will throw if necessary)
+            this.formulaStr = authenticateFormula(formula);
 
-            // goal: 
-            //      iterate through each token; 
-            //      standardize #'s and vars;
-            //      check for errors, 
-            //      finally, add the token to the formulaStr
+            // initialize the list of variables
+            createVariablesList();
+        }
+
+        /// <summary>
+        /// Helper for Constructor.
+        /// Rejects invalid formulas for the reasons described in the constructor / in the PS3 specifications.
+        /// May throw a FormulaFormatException.
+        /// </summary>
+        /// <param name="formula">the original string passed to the constructor</param>
+        /// <returns>a standardized version of the formula-string</returns>
+        private string authenticateFormula(string formula)
+        {
+            // this string stores the final product
+            string authenticatedForm = "";
 
             // initialize var's to detect errors
-            int leftParenCounter = 0;   // strategy: increment this when token is "(", decrement this when token is ")"
-            string firstToken = "";          // strategy: only update this once, when it's null
-            string lastToken = "";           // strategy: update this every time a token is processed, evaluate once all tokens have been processed
+            int leftParenCounter = 0; // increment this when token is "(", decrement this when token is ")"
+            string firstToken = "";
+            string lastToken = "";
 
-            // manually done foreach loop: allows me to reassign "token"
+            // process each token: check for errors & append to final string
             IEnumerator<string> tokenEnum = Formula.GetTokens(formula).GetEnumerator();
             while (tokenEnum.MoveNext())
             {
                 string token = tokenEnum.Current;
 
+                // STANDARDIZE TOKEN
+                // if token is a double
+                if (Double.TryParse(token, out double value))
+                {
+                    // standardize the precision: token (string) -> value (double) -> ToString (string)
+                    token = value.ToString();
+                }
+
+                // if token is a variable
+                if (Regex.IsMatch(token, @"^[a-zA-Z_](?: [a-zA-Z_]|\d)*$"))
+                {
+                    // convert variable to normalized form
+                    token = normalize(token);
+                    if (!isValid(token))
+                        throw new FormulaFormatException("Error: Invalid variable name.");
+                }
+
+
+                // ADJUST ERROR-DETECTION VARIABLES
                 // first time only: capture the first token for error-checking
                 if (firstToken == "")
                     firstToken = token;
 
-                // error 1
+                // update the parentheses counter
+                if (token == "(")
+                    leftParenCounter++;
+                else if (token == ")")
+                    leftParenCounter--;
+
+
+                // CATCH MID-PROCESS ERRORS
+                // error 1 (Unrecognized Token)
                 if (!isParseableToken(token))
                     throw new FormulaFormatException("Error: Formula contains unrecognized token.");
+
+                // error 3 (Right Parentheses Rule)
+                if (leftParenCounter < 0)
+                    throw new FormulaFormatException("Error: ");
 
                 // error 7 (Parenthesis/Operator Following Rule)
                 if (lastToken == "(" || isOperator(lastToken))
@@ -134,7 +180,7 @@ namespace SpreadsheetUtilities
                         throw new FormulaFormatException("Error: Previous token was '" + lastToken + "'. Next token must be a Number, Variable, or '('.");
                     }
                 }
-                
+
                 // error 8 (Extra Following Rule)
                 if (lastToken == ")" || isVariable(lastToken) || isDouble(lastToken))
                 {
@@ -150,80 +196,39 @@ namespace SpreadsheetUtilities
                 }
 
 
-                // check: t is a "("
-                if (token == "(")
-                    leftParenCounter++;
-
-                // check: t is a ")"
-                else if (token == ")")
-                    leftParenCounter--;
-
-                // check: t is a double
-                else if (Double.TryParse(token, out double value))
-                {
-                    // standardize the precision: token (string) -> value (double) -> ToString (string)
-                    token = value.ToString();
-                }
-
-                // check: t is a var
-                else if (matchesBasicVarPattern(token))
-                {
-                    token = normalize(token);
-                    if (!isValid(token))
-                        throw new FormulaFormatException("Error: Invalid variable name.");
-                }
-
-
-                
+                // CONCLUDE ITERATION
                 // add the final version of token to the backing-string, reintroduce a space for later parsing
-                formulaStr += token + " ";
+                authenticatedForm += token + " ";
 
                 // set up the next iteration
                 lastToken = token;
             }
 
-            // delete the trailing space
-            formulaStr = formulaStr.Trim();
+            // all tokens have now been processed...
 
-            // all tokens processed...
-
-            // error 2
-            if (formulaStr == "")
+            // error 2 (One Token Rule)
+            if (authenticatedForm == "")
                 throw new FormulaFormatException("Error: Formula must contain at least one token.");
 
-            // error 4
+            // error 4 (Balanced Parentheses Rule)
             if (leftParenCounter != 0)
                 throw new FormulaFormatException("Error: Formula contains unmatched parentheses.");
 
-            // error 5
-            if (!isValidStartToken(firstToken))
+            // error 5 (Starting Token Rule)
+            if (!isDouble(firstToken) && !isVariable(firstToken) && !(firstToken == "("))
                 throw new FormulaFormatException("Error: Formula cannot start with '" + firstToken + "'.");
 
-            // error 6
-            if (!isValidEndToken(lastToken))
+            // error 6 (Ending Token Rule)
+            if (!isDouble(lastToken) && !isVariable(lastToken) && !(lastToken == ")"))
                 throw new FormulaFormatException("Error: Formula cannot end with '" + lastToken + "'.");
 
-
-
+            // finally, the formula has been standardized + has found error-free
+            authenticatedForm = authenticatedForm.Trim();
+            return authenticatedForm;
         }
 
         /// <summary>
-        /// Helper for Constructor.
-        /// Returns true if the string matches the basic regex for a variable.
-        /// Ignores the isValid requirement.
-        /// </summary>
-        /// <param name="token">The string that might be a variable</param>
-        /// <returns>True if the string matches the basic regex for a variable.</returns>
-        private bool matchesBasicVarPattern(string token)
-        {
-            // Patterns borrowed from GetTokens, modified to have ^ and $ 
-            String varPattern = @"^[a-zA-Z_](?: [a-zA-Z_]|\d)*$";
-
-            return Regex.IsMatch(token, varPattern);
-        }
-
-        /// <summary>
-        /// Helper method for Constructor, Evaluate, and GetVariables.
+        /// Helper method for authenticateFormula, Evaluate, and createVariablesList.
         /// Returns true if the string represents a valid variable name.
         /// "str" must fit the basic variable pattern AND pass this Formula's specific Validator requirements.
         /// </summary>
@@ -245,7 +250,7 @@ namespace SpreadsheetUtilities
         }
 
         /// <summary>
-        /// Helper for Constructor.
+        /// Helper for authenticateFormula.
         /// Determines if a string could be evaluated to a double.
         /// </summary>
         /// <param name="str">a string potentially representing a double-precision number</param>
@@ -256,7 +261,7 @@ namespace SpreadsheetUtilities
         }
 
         /// <summary>
-        /// Helper for Constructor.
+        /// Helper for authenticateFormula.
         /// Detects if string "token" is an operator, i.e. +, -, /, or *
         /// </summary>
         /// <param name="token">A string potentially representing an operator</param>
@@ -268,12 +273,12 @@ namespace SpreadsheetUtilities
         }
 
         /// <summary>
-        /// Helper for Constructor. 
+        /// Helper for authenticateFormula. 
         /// Detects if string is a valid component of a formula.
         /// Valid tokens include: (, ), variables, operators, numbers
         /// </summary>
-        /// <param name="token"></param>
-        /// <returns></returns>
+        /// <param name="token">The string of interest</param>
+        /// <returns>True if "token" is a valid component of a formula.</returns>
         private bool isParseableToken(string token)
         {
             if (token == "(")
@@ -292,27 +297,22 @@ namespace SpreadsheetUtilities
         }
 
         /// <summary>
-        /// Helper for Constructor.
-        /// Returns true if the string is a number, variable, or "("
+        /// Meant to be called once at construction.
+        /// Initializes a list of variables, which can later be returned by GetVariables().
         /// </summary>
-        /// <param name="start">The token being evaluated</param>
-        /// <returns>True if the string is a number, variable, or "("</returns>
-        private bool isValidStartToken(string start)
+        private void createVariablesList()
         {
-            return isDouble(start) || isVariable(start) || start == "(";
-        }
+            // a list containing each previously-seen variable
+            List<string> uniqueVars = new List<string>();
 
-        /// <summary>
-        /// Helper for Constructor.
-        /// Returns true if the string is a number, variable, or ")"
-        /// </summary>
-        /// <param name="start">The token being evaluated</param>
-        /// <returns>True if the string is a number, variable, or ")"</returns>
-        private bool isValidEndToken(string end)
-        {
-            return isDouble(end) || isVariable(end) || end == ")";
-        }
+            foreach (string token in Formula.GetTokens(this.formulaStr))
+            {
+                if (isVariable(token) && !uniqueVars.Contains(token))
+                    uniqueVars.Add(token);
+            }
 
+            this.uniqueVariables = uniqueVars;
+        }
 
 
         /// <summary>
@@ -353,7 +353,7 @@ namespace SpreadsheetUtilities
                     // if * or / is on top of the opStack, apply the operation accordingly, return error if necessary
                     multiplyOrDivide(valueStack, opStack, out bool divisionByZeroOccurred);
                     if (divisionByZeroOccurred)
-                        return DivisionByZeroError();
+                        return getDivByZeroError();
                 }
 
                 // check: t is a var
@@ -373,7 +373,7 @@ namespace SpreadsheetUtilities
                     // if * or / is on top of the opStack, apply the operation accordingly, return error if necessary
                     multiplyOrDivide(valueStack, opStack, out bool divisionByZeroOccurred);
                     if (divisionByZeroOccurred)
-                        return DivisionByZeroError();
+                        return getDivByZeroError();
                 }
 
                 // check: t is a + or -
@@ -408,7 +408,7 @@ namespace SpreadsheetUtilities
                     // if * or / is on top of the opStack, apply the operation accordingly, return error if necessary
                     multiplyOrDivide(valueStack, opStack, out bool divisionByZeroOccurred);
                     if (divisionByZeroOccurred)
-                        return DivisionByZeroError();
+                        return getDivByZeroError();
                 }
             }
 
@@ -468,10 +468,13 @@ namespace SpreadsheetUtilities
 
                 if (prevOp == "*")
                     valueStack.Push(prevValue * currValue);
-                else if (prevOp == "/" && currValue != 0)
-                    valueStack.Push(prevValue / currValue);
-                else
-                    divisionByZeroOccurred = true;
+                else // prevOp == "/"
+                {
+                    if (currValue != 0)
+                        valueStack.Push(prevValue / currValue);
+                    else
+                        divisionByZeroOccurred = true;
+                }
             }
         }
 
@@ -481,7 +484,7 @@ namespace SpreadsheetUtilities
         /// Helper for Evaluate.
         /// </summary>
         /// <returns>Returns a Formula Error to be used when division by zero occurs.</returns>
-        private FormulaError DivisionByZeroError()
+        private FormulaError getDivByZeroError()
         {
             return new FormulaError("Division By Zero error. Try changing your formula, or redefining certain variables.");
         }
@@ -499,16 +502,7 @@ namespace SpreadsheetUtilities
         /// </summary>
         public IEnumerable<String> GetVariables()
         {
-            // a set containing each variable (without duplicates)
-            HashSet<string> distinctVariables = new HashSet<string>();
-
-            foreach (string token in Formula.GetTokens(this.formulaStr))
-            {
-                if (isVariable(token))
-                    distinctVariables.Add(token);
-            }
-
-            return distinctVariables;
+            return uniqueVariables;
         }
 
         /// <summary>
@@ -579,10 +573,7 @@ namespace SpreadsheetUtilities
         /// </summary>
         public static bool operator !=(Formula f1, Formula f2)
         {
-            if (ReferenceEquals(f1, null))
-                return !ReferenceEquals(f2, null);
-
-            return !f1.Equals(f2);
+            return !(f1 == f2);
         }
 
         /// <summary>

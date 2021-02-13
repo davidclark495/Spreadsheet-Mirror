@@ -53,7 +53,7 @@ namespace FormulaTestsNamespace
         [ExpectedException(typeof(FormulaFormatException))]
         public void Constructor_Error_RightParenthesesRule()
         {
-            Formula form = new Formula(" ( C3 + 2 ) ) (");
+            Formula form = new Formula(" ( C3 + 2 ) ) + ( 5");
         }
 
         /// <summary>
@@ -129,9 +129,19 @@ namespace FormulaTestsNamespace
         /// </summary>
         [TestMethod]
         [ExpectedException(typeof(FormulaFormatException))]
-        public void Constructor_InvalidVar_NormalizeRuinsIt()
+        public void Constructor_InvalidVar_NormalizeRuinsIt_StandardRules()
         {
             Formula form = new Formula("a1 + 5", str => "---TheOnlyVariable---", str => true);
+        }
+
+        /// <summary>
+        /// The normalize function changes the variable str to a string that the validator rejects.
+        /// </summary>
+        [TestMethod]
+        [ExpectedException(typeof(FormulaFormatException))]
+        public void Constructor_InvalidVar_NormalizeRuinsIt_ValidatorRules()
+        {
+            Formula form = new Formula("a1 + 5", str => "long_name_that_the_validator_rejects", str => str.Length < 5);
         }
 
 
@@ -139,6 +149,12 @@ namespace FormulaTestsNamespace
         public void Evaluate_DivByZero()
         {
             Assert.IsInstanceOfType(new Formula("1 / 0").Evaluate(zeroLookup), typeof(FormulaError));
+            Assert.IsInstanceOfType(new Formula("1 / ( 3 - 3 )").Evaluate(zeroLookup), typeof(FormulaError));
+            Assert.IsInstanceOfType(new Formula("1 / _zeroVar").Evaluate(zeroLookup), typeof(FormulaError));
+
+            // this bit isn't implementation agnostic, but it shows that the right error is being thrown
+            FormulaError error = (FormulaError)(new Formula("1 / 0").Evaluate(zeroLookup));
+            Assert.AreEqual("Division By Zero error. Try changing your formula, or redefining certain variables.", error.Reason);
         }
 
         [TestMethod]
@@ -156,6 +172,17 @@ namespace FormulaTestsNamespace
             Assert.AreEqual(2.0, val1, delta);
             Assert.AreEqual(8.0, val2, delta);
             Assert.AreEqual(5.0, val3, delta);
+        }
+
+        [TestMethod]
+        public void Evaluate_Variables()
+        {
+            double val1 = (double)(new Formula("1 + A0").Evaluate(zeroLookup));
+            double val2 = (double)(new Formula("( x + 3 ) * 2").Evaluate(zeroLookup));
+            double val3 = (double)(new Formula("_value / 5 + 3 - 3").Evaluate(zeroLookup));
+            Assert.AreEqual(1.0, val1, delta);
+            Assert.AreEqual(6.0, val2, delta);
+            Assert.AreEqual(0.0, val3, delta);
         }
 
         /// <summary>
@@ -203,6 +230,30 @@ namespace FormulaTestsNamespace
         }
 
         /// <summary>
+        /// The formula should be able to return a list of variables without repeats. 
+        /// A normalize function is not provided to the Formula.
+        /// The variables are meant to appear in the order they are found in the formula.
+        /// </summary>
+        [TestMethod]
+        public void GetVariables_InSequence()
+        {
+            Formula form = new Formula("A1 + b1 - C1 / (D1 * A1) + d1");
+
+            IEnumerator<string> varEnum = form.GetVariables().GetEnumerator();
+
+            varEnum.MoveNext();
+            Assert.AreEqual("A1", varEnum.Current);
+            varEnum.MoveNext();
+            Assert.AreEqual("b1", varEnum.Current);
+            varEnum.MoveNext();
+            Assert.AreEqual("C1", varEnum.Current);
+            varEnum.MoveNext();
+            Assert.AreEqual("D1", varEnum.Current);
+            varEnum.MoveNext();
+            Assert.AreEqual("d1", varEnum.Current);
+        }
+
+        /// <summary>
         /// The Formula should be able to return a list of variables without repeats. 
         /// The Formula has been given a normalize function.
         /// </summary>
@@ -228,7 +279,6 @@ namespace FormulaTestsNamespace
             // If a variable was missing from the Formula's list, Count > 0, so the test will fail.
             Assert.AreEqual(0, expectedVars.Count);
         }
-
 
         /// <summary>
         /// ToString() should produce a string that can be used to initialize a new Formula.
