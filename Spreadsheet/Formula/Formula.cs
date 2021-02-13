@@ -141,7 +141,8 @@ namespace SpreadsheetUtilities
                     // convert variable to normalized form
                     token = normalize(token);
                     if (!isValid(token))
-                        throw new FormulaFormatException("Error: Invalid variable name.");
+                        throw new FormulaFormatException("Error: Invalid variable name. " +
+                            "Try changing your Normalize or IsValid delegates.");
                 }
 
 
@@ -160,11 +161,13 @@ namespace SpreadsheetUtilities
                 // CATCH MID-PROCESS ERRORS
                 // error 1 (Unrecognized Token)
                 if (!isParseableToken(token))
-                    throw new FormulaFormatException("Error: Formula contains unrecognized token.");
+                    throw new FormulaFormatException("Error: Formula contains unrecognized token. " +
+                        "The only recognized tokens are (, ), +, -, *, /, variables, and decimal numbers.");
 
                 // error 3 (Right Parentheses Rule)
                 if (leftParenCounter < 0)
-                    throw new FormulaFormatException("Error: ");
+                    throw new FormulaFormatException("Error: A ')' was encountered without a corresponding '('. " +
+                        "Try inserting a '(' earlier in the formula.");
 
                 // error 7 (Parenthesis/Operator Following Rule)
                 if (lastToken == "(" || isOperator(lastToken))
@@ -177,7 +180,8 @@ namespace SpreadsheetUtilities
                     else if (token == "(") { } // no issue
                     else
                     {
-                        throw new FormulaFormatException("Error: Previous token was '" + lastToken + "'. Next token must be a Number, Variable, or '('.");
+                        throw new FormulaFormatException("Error: Previous token was '" + lastToken + "'. " +
+                            "Next token must be a Number, Variable, or '('.");
                     }
                 }
 
@@ -191,7 +195,8 @@ namespace SpreadsheetUtilities
                     else if (token == ")") { } // no issue
                     else
                     {
-                        throw new FormulaFormatException("Error: Previous token was '" + lastToken + "'. Next token must be an Operator or a ')'.");
+                        throw new FormulaFormatException("Error: Previous token was '" + lastToken + "'. " +
+                            "Next token must be an Operator or a ')'.");
                     }
                 }
 
@@ -208,19 +213,23 @@ namespace SpreadsheetUtilities
 
             // error 2 (One Token Rule)
             if (authenticatedForm == "")
-                throw new FormulaFormatException("Error: Formula must contain at least one token.");
+                throw new FormulaFormatException("Error: Formula must contain at least one token. " +
+                    "Try adding additional tokens.");
 
             // error 4 (Balanced Parentheses Rule)
             if (leftParenCounter != 0)
-                throw new FormulaFormatException("Error: Formula contains unmatched parentheses.");
+                throw new FormulaFormatException("Error: Formula contains unmatched parentheses. " +
+                    "Check to see that the number of '(' is equal to the number of ')' in your Formula.");
 
             // error 5 (Starting Token Rule)
             if (!isDouble(firstToken) && !isVariable(firstToken) && !(firstToken == "("))
-                throw new FormulaFormatException("Error: Formula cannot start with '" + firstToken + "'.");
+                throw new FormulaFormatException("Error: Formula cannot start with '" + firstToken + "'. " +
+                    "Valid starting tokens include numbers, variables, and '('.");
 
             // error 6 (Ending Token Rule)
             if (!isDouble(lastToken) && !isVariable(lastToken) && !(lastToken == ")"))
-                throw new FormulaFormatException("Error: Formula cannot end with '" + lastToken + "'.");
+                throw new FormulaFormatException("Error: Formula cannot end with '" + lastToken + "'. " +
+                    "Valid ending tokens include numbers, variables, and ')'.");
 
             // finally, the formula has been standardized + has found error-free
             authenticatedForm = authenticatedForm.Trim();

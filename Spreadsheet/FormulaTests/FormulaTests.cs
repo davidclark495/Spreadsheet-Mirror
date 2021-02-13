@@ -175,6 +175,13 @@ namespace FormulaTests
         }
 
         [TestMethod]
+        public void Evaluate_Decimals()
+        {
+            double val1 = (double)(new Formula("0.5 + 0.29").Evaluate(zeroLookup));
+            Assert.AreEqual(0.79, val1, delta);
+        }
+
+        [TestMethod]
         public void Evaluate_Variables()
         {
             double val1 = (double)(new Formula("1 + A0").Evaluate(zeroLookup));
