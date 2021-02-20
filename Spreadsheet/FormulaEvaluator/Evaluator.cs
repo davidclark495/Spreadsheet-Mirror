@@ -1,5 +1,6 @@
-﻿// Author:  David Clark, Spring 2021
-// University of Utah
+﻿// Author:  David Clark
+// CS 3500
+// January 2021
 
 using System;
 using System.Collections.Generic;
