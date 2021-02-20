@@ -11,8 +11,13 @@ namespace SS
 {
     public class Spreadsheet : AbstractSpreadsheet
     {
-        // 
+        // Tracks the relationships between Cells.
+        // References Cells using a string (the cell's name), does not contain a reference to the Cell class itself
         private DependencyGraph depGraph;
+
+        // Tracks all Cells that currently contain a Double, a Formula, or a non-empty String
+        // The key-value pairs correspond to a cell name (a string representing a valid variable) and a Cell object.
+        // Cells do not track their own names.
         private Dictionary<string, Cell> nonemptyCellsDict;
 
         public Spreadsheet()
@@ -28,6 +33,7 @@ namespace SS
         private bool isValidCellName(string name)
         {
             // Create a new Formula with the name. If Formula throws, the name was rejected, i.e. it is not a valid variable name.
+            // This method creates consistency between Formula's and Spreadsheet's definitions of what constitutes a valid name.
             try
             {
                 new Formula(name);
@@ -167,12 +173,13 @@ namespace SS
 
         public override IList<string> SetCellContents(string name, Formula formula)
         {
-            // throws exceptions if necessary
+            // EXCEPTIONS
+            // InvalidNameException cases
             throwIfInvalidName(name);
-
+            // formula is null case
             if (ReferenceEquals(formula, null))
                 throw new ArgumentNullException();
-            
+            // if adding this formula would cause a circular dependency, then throw a CircularException here
             throwIfCircularException(name, formula);
 
 

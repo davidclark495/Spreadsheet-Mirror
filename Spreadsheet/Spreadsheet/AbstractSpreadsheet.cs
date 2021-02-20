@@ -184,21 +184,41 @@ namespace SS
         /// A helper for the GetCellsToRecalculate method.
         /// 
         ///   -- You should fully comment what is going on below --
+        ///   
+        /// A recursive process for finding all of the dependents of a given Cell.
+        /// The initial call to this method should evaluate the "start" cell (i.e., have "start" and "name" be equivalent).
+        /// 
+        /// A single iteration of this method will find each direct dependent of the current cell,
+        /// then visit those recursively; when it has visited each of its direct dependents, 
+        /// it will add itself to the list of changed cells. 
+        /// 
+        /// By adding itself after all of its dependents (and their dependents, and so on), 
+        /// each cell guarantees that the "changed" list will have a reverse-topological ordering.
+        /// The cell adds itself to the front, so the original cell comes first. Any given cell will be in the list
+        /// before any of its dependents.
+        /// 
+        /// All cells seen by this method will be dependents of "start," 
+        /// so if any cell has "start" as a dependent, 
+        /// then a circular dependency is present in the spreadsheet and an exception must be thrown.
         /// </summary>
         private void Visit(string start, string name, ISet<string> visited, LinkedList<string> changed)
         {
             visited.Add(name);
+            // find each direct dependent of "name" (which should all ultimately be dependents of "start"
             foreach (string n in GetDirectDependents(name))
             {
+                // this would mean the original cell is a dependent of one of its dependents from further down the line; error
                 if (n.Equals(start))
                 {
                     throw new CircularException();
                 }
+                // this would mean "n" is a dependent of start that hasn't yet been identified; visit it (recursion) before continuing
                 else if (!visited.Contains(n))
                 {
                     Visit(start, n, visited, changed);
                 }
             }
+            // add the current cell to the "changed" list at the front.
             changed.AddFirst(name);
         }
 
