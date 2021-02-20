@@ -1,3 +1,7 @@
+// Author: David Clark
+// CS 3500
+// February 2021
+
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
