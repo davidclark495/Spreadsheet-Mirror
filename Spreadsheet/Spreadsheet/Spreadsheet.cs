@@ -60,38 +60,6 @@ namespace SS
                 throw new InvalidNameException();
         }
 
-        /// <summary>
-        /// Helper for SetCellContents(Formula).
-        /// Throws a CircularException if changing this Cell's value to the given formula
-        /// would result in a cycle.
-        /// </summary>
-        /// <param name="name">the name of a valid cell in this spreadsheet</param>
-        /// <param name="formula">the formula that would be used as the Cell's new value</param>
-        private void throwIfCircularException(string name, Formula formula)
-        {
-            // enumerate through each dependent of the cell tagged as "name"
-            IEnumerator<string> dependentsEnum = GetCellsToRecalculate(name).GetEnumerator();
-
-            // skip the first element, which should be the original cell itself
-            dependentsEnum.MoveNext();
-
-            while (dependentsEnum.MoveNext())
-            {
-                string currDependent = dependentsEnum.Current;
-
-                // if the currDependent cell is referenced in the formula, then the cell would depend on its own dependents
-                // --> throw exception
-                foreach (string var in formula.GetVariables())
-                {
-                    if (var == currDependent)
-                        throw new CircularException();
-                }
-
-            }
-
-
-        }
-
         public override object GetCellContents(string name)
         {
             // throws an InvalidNameException if necessary
@@ -173,28 +141,37 @@ namespace SS
 
         public override IList<string> SetCellContents(string name, Formula formula)
         {
-            // EXCEPTIONS
-            // InvalidNameException cases
+            // throw exceptions if necessary
             throwIfInvalidName(name);
-            // formula is null case
             if (ReferenceEquals(formula, null))
                 throw new ArgumentNullException();
-            // if adding this formula would cause a circular dependency, then throw a CircularException here
-            throwIfCircularException(name, formula);
 
-
-            // replaces the Cell's contents, or creates a new cell
+            // replaces the Cell's contents and creates a backup, or creates a new cell
+            Object originalCellContents = null;
             if (nonemptyCellsDict.TryGetValue(name, out Cell cellToReset))
+            {
+                originalCellContents = cellToReset.Contents;
                 cellToReset.Contents = formula;
+            }
             else
                 nonemptyCellsDict.Add(name, new Cell(formula));
 
-            // updates the Cell's dependencees
+            // updates the Cell's dependencees and creates a backup
+            IEnumerable<string> originalDependees = depGraph.GetDependees(name);
             depGraph.ReplaceDependees(name, formula.GetVariables());
 
+            // returns the list of self + direct/indirect dependents, or detects a Circular Exception and resets
+            try
+            {
+                return GetListToRecalculate(name);
+            }
+            catch (CircularException e)
+            {
+                cellToReset.Contents = originalCellContents;
+                depGraph.ReplaceDependees(name, originalDependees);
 
-            // returns the list of self + direct/indirect dependents
-            return GetListToRecalculate(name);
+                throw e;
+            }
         }
 
         protected override IEnumerable<string> GetDirectDependents(string name)
