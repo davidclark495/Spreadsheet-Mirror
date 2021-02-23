@@ -6,6 +6,7 @@ using SpreadsheetUtilities;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Xml;
 
 namespace SS
 {
@@ -20,7 +21,11 @@ namespace SS
         // Cells do not track their own names.
         private Dictionary<string, Cell> nonemptyCellsDict;
 
-        public override bool Changed { get => throw new NotImplementedException(); protected set => throw new NotImplementedException(); }
+        public override bool Changed
+        {
+            get => throw new NotImplementedException();
+            protected set => throw new NotImplementedException();
+        }
 
         public Spreadsheet() : base(s => true, s => s, "default")
         {
@@ -29,28 +34,9 @@ namespace SS
         }
 
         /// <summary>
-        /// Returns true if "name" is valid as determined by the Formula class.
-        /// </summary>
-        /// <param name="name">a potential cell name</param>
-        private bool isValidCellName(string name)
-        {
-            // Create a new Formula with the name. If Formula throws, the name was rejected, i.e. it is not a valid variable name.
-            // This method creates consistency between Formula's and Spreadsheet's definitions of what constitutes a valid name.
-            try
-            {
-                new Formula(name);
-                return true;
-            }
-            catch (FormulaFormatException e)
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
         /// Throws an InvalidNameException if...
         /// ...a cell name is null
-        /// ...a cell name doesn't match the Formula specifications for a variable
+        /// ...a cell name doesn't match the SpreadSheet specifications for a variable
         /// </summary>
         /// <param name="name"></param>
         private void throwIfInvalidName(string name)
@@ -60,6 +46,21 @@ namespace SS
 
             if (!isValidCellName(name))
                 throw new InvalidNameException();
+        }
+
+        /// <summary>
+        /// Returns true if "name" is valid for a spreadsheet AND is valid for the spreadsheet's validator function.
+        /// "name" must be one or more letters followed by one or more digits.
+        /// </summary>
+        /// <param name="name">a potential cell name</param>
+        private bool isValidCellName(string name)
+        {
+            string validNamePattern = @"^[a-zA-Z]+[0-9]+$";
+            bool passesSpreadsheetSpecs = System.Text.RegularExpressions.Regex.IsMatch(name, validNamePattern);
+
+            bool passesValidator = IsValid(name);
+
+            return passesSpreadsheetSpecs && passesValidator;
         }
 
         public override object GetCellContents(string name)
@@ -79,33 +80,44 @@ namespace SS
 
         }
 
+        public override object GetCellValue(string name)
+        {
+            throwIfInvalidName(name);
+
+            if (nonemptyCellsDict.TryGetValue(name, out Cell cell))
+                return cell.Value;
+            else
+                return "";
+        }
+
         public override IEnumerable<string> GetNamesOfAllNonemptyCells()
         {
             return nonemptyCellsDict.Keys;
         }
 
-        /// <summary>
-        /// Helper for SetCellContents().
-        /// Returns a list of a Cell and all of its direct/indirect dependents.
-        /// Based on GetCellsToRecalculate().
-        /// </summary>
-        /// <param name="name">the name of a cell in this spreadsheet</param>
-        private IList<string> GetListToRecalculate(string name)
+        public override IList<string> SetContentsOfCell(string name, string content)
         {
-            IList<string> listToRecalc = new List<string>();
-            foreach (string tempCellName in GetCellsToRecalculate(name))
+            throwIfInvalidName(name);
+            if (ReferenceEquals(content, null))
+                throw new ArgumentNullException();
+
+
+            if (Double.TryParse(content, out double newContentDouble))
             {
-                listToRecalc.Add(tempCellName);
+                return SetCellContents(name, newContentDouble);
+            }
+            else if (content.StartsWith("="))
+            {
+                try { return SetCellContents(name, new Formula(content, Normalize, IsValid)); }
+                catch (FormulaFormatException e) { }
             }
 
-            return listToRecalc;
+            // contents must be a string
+            return SetCellContents(name, content);
         }
 
         protected override IList<string> SetCellContents(string name, double number)
         {
-            // throws exceptions if necessary
-            throwIfInvalidName(name);
-
             // replaces the Cell's contents, or creates a new cell
             if (nonemptyCellsDict.TryGetValue(name, out Cell cellToReset))
                 cellToReset.Contents = number;
@@ -118,11 +130,6 @@ namespace SS
 
         protected override IList<string> SetCellContents(string name, string text)
         {
-            // throws exceptions if necessary
-            throwIfInvalidName(name);
-            if (ReferenceEquals(text, null))
-                throw new ArgumentNullException();
-
             // replaces the Cell's contents, or creates a new cell
             if (nonemptyCellsDict.TryGetValue(name, out Cell cellToReset))
             {
@@ -143,11 +150,6 @@ namespace SS
 
         protected override IList<string> SetCellContents(string name, Formula formula)
         {
-            // throw exceptions if necessary
-            throwIfInvalidName(name);
-            if (ReferenceEquals(formula, null))
-                throw new ArgumentNullException();
-
             // replaces the Cell's contents and creates a backup, or creates a new cell
             Object originalCellContents = null;
             if (nonemptyCellsDict.TryGetValue(name, out Cell cellToReset))
@@ -176,6 +178,25 @@ namespace SS
             }
         }
 
+
+        /// <summary>
+        /// Helper for SetCellContents().
+        /// Returns a list of a Cell and all of its direct/indirect dependents.
+        /// Based on GetCellsToRecalculate().
+        /// </summary>
+        /// <param name="name">the name of a cell in this spreadsheet</param>
+        private IList<string> GetListToRecalculate(string name)
+        {
+            IList<string> listToRecalc = new List<string>();
+            foreach (string tempCellName in GetCellsToRecalculate(name))
+            {
+                listToRecalc.Add(tempCellName);
+            }
+
+            return listToRecalc;
+        }
+
+
         protected override IEnumerable<string> GetDirectDependents(string name)
         {
             return depGraph.GetDependents(name);
@@ -183,22 +204,48 @@ namespace SS
 
         public override string GetSavedVersion(string filename)
         {
-            throw new NotImplementedException();
+            return "blatantly unfinished";
+            using (XmlReader reader = XmlReader.Create("temp.xml"))
+            {
+
+            }
         }
 
         public override void Save(string filename)
         {
-            throw new NotImplementedException();
+            XmlWriterSettings settings = new XmlWriterSettings();
+            settings.Indent = true;
+            settings.IndentChars = "   ";
+
+            using (XmlWriter writer = XmlWriter.Create("temp.xml", settings))
+            {
+                writer.WriteStartDocument();
+                writer.WriteStartElement("spreadsheet");
+                writer.WriteAttributeString("version", this.Version);
+
+                foreach (string tempCellName in GetNamesOfAllNonemptyCells())
+                {
+                    // this should never return false
+                    nonemptyCellsDict.TryGetValue(tempCellName, out Cell tempCell);
+
+                    writer.WriteStartElement("cell");
+                    writer.WriteElementString("name", tempCellName);
+                    writer.WriteStartElement("contents");
+                    if (tempCell.Contents is Double)
+                        writer.WriteValue(tempCell.Contents.ToString());
+                    else if (tempCell.Contents is Formula)
+                        writer.WriteValue("="+tempCell.Contents.ToString());
+                    else if (tempCell.Contents is String)
+                        writer.WriteValue(tempCell.Contents.ToString());
+                    writer.WriteEndElement();// ends "contents" element
+                    writer.WriteEndElement();// ends "cell" element
+                }
+                writer.WriteEndElement();// ends "spreadsheet" element
+                writer.WriteEndDocument();
+            }
         }
 
-        public override object GetCellValue(string name)
-        {
-            throw new NotImplementedException();
-        }
 
-        public override IList<string> SetContentsOfCell(string name, string content)
-        {
-            throw new NotImplementedException();
-        }
+
     }
 }
