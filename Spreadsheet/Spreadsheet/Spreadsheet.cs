@@ -101,7 +101,6 @@ namespace SS
 
         public override IList<string> SetCellContents(string name, double number)
         {
-            // throws exceptions if necessary
             throwIfInvalidName(name);
 
             // replaces the Cell's contents, or creates a new cell
@@ -110,48 +109,47 @@ namespace SS
             else
                 nonemptyCellsDict.Add(name, new Cell(number));
 
-            // returns the list of self + direct/indirect dependents
+            // cells without formulas cannot depend on other cells
+            depGraph.ReplaceDependees(name, new List<string>());
+
             return GetListToRecalculate(name);
         }
 
         public override IList<string> SetCellContents(string name, string text)
         {
-            // throws exceptions if necessary
             throwIfInvalidName(name);
             if (ReferenceEquals(text, null))
                 throw new ArgumentNullException();
 
-            // replaces the Cell's contents, or creates a new cell
+            // replace the Cell's contents, or creates a new cell
             if (nonemptyCellsDict.TryGetValue(name, out Cell cellToReset))
-            {
                 cellToReset.Contents = text;
-
-                // if the cell was set to the empty string, remove it from the dictionary
-                if (text == "")
-                    nonemptyCellsDict.Remove(name);
-            }
             else
-            {
                 nonemptyCellsDict.Add(name, new Cell(text));
-            }
 
-            // returns the list of self + direct/indirect dependents
+            // if the cell is now empty, remove the reference to it
+            if (text == "")
+                nonemptyCellsDict.Remove(name);
+
+            // cells without formulas cannot depend on other cells
+            depGraph.ReplaceDependees(name, new List<string>());
+
             return GetListToRecalculate(name);
         }
 
         public override IList<string> SetCellContents(string name, Formula formula)
         {
-            // throw exceptions if necessary
             throwIfInvalidName(name);
             if (ReferenceEquals(formula, null))
                 throw new ArgumentNullException();
 
             // replaces the Cell's contents and creates a backup, or creates a new cell
-            Object originalCellContents = null;
-            if (nonemptyCellsDict.TryGetValue(name, out Cell cellToReset))
+            Cell originalCell = null;
+            Object originalContentsBackup = null;
+            if (nonemptyCellsDict.TryGetValue(name, out originalCell))
             {
-                originalCellContents = cellToReset.Contents;
-                cellToReset.Contents = formula;
+                originalContentsBackup = originalCell.Contents;
+                originalCell.Contents = formula;
             }
             else
                 nonemptyCellsDict.Add(name, new Cell(formula));
@@ -160,14 +158,20 @@ namespace SS
             IEnumerable<string> originalDependees = depGraph.GetDependees(name);
             depGraph.ReplaceDependees(name, formula.GetVariables());
 
-            // returns the list of self + direct/indirect dependents, or detects a Circular Exception and resets
-            try
+            try // return as expected
             {
                 return GetListToRecalculate(name);
             }
-            catch (CircularException e)
+            catch (CircularException e) // a Circular Exception was introduced --> revert the Cell, then throw the exception
             {
-                cellToReset.Contents = originalCellContents;
+                // if the cell was previously nonempty, then restore the cell's contents
+                // else the cell was empty, remove it from the non-empty dictionary
+                if (!ReferenceEquals(originalCell, null))
+                    originalCell.Contents = originalContentsBackup;
+                else
+                    nonemptyCellsDict.Remove(name);
+
+                // restore the cell's original dependencies
                 depGraph.ReplaceDependees(name, originalDependees);
 
                 throw e;
