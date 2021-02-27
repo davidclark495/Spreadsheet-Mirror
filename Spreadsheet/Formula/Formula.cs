@@ -376,7 +376,7 @@ namespace SpreadsheetUtilities
                     }
                     catch (ArgumentException e)
                     {
-                        return new FormulaError("Unknown Variable: your Lookup function couldn't find a reference to " + normalize(token) + ".");
+                        return new FormulaError("Unknown Variable: your Lookup function couldn't find a value for " + normalize(token) + ".");
                     }
 
                     // if * or / is on top of the opStack, apply the operation accordingly, return error if necessary
