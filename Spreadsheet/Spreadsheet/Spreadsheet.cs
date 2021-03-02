@@ -42,9 +42,9 @@ namespace SS
         /// <summary>
         /// Invokes the three-argument constructor. 
         /// The resulting spreadsheet will have:
-        /// ...a validator that always accepts a given cell name (although the name may be rejected for other reasons)
-        /// ...a normalize delegate that doesn't modify incoming names
-        /// ...the "default" version setting
+        /// ...a validator that always accepts a given cell name (although the name may be rejected for other reasons).
+        /// ...a normalize delegate that doesn't modify incoming names.
+        /// ...the "default" version setting.
         /// </summary>
         public Spreadsheet()
             : this(s => true, s => s, "default")
@@ -67,6 +67,10 @@ namespace SS
 
         /// <summary>
         /// Invokes the three-argument constructor, then populates the spreadsheet with data read from the given file.
+        /// This will throw a SpreadsheetReadWriteException if:
+        /// ...the file is unreachable.
+        /// ...the file is not a valid encoding of a spreadsheet.
+        /// ...the file's version is incompatible with the version specified as a parameter.
         /// </summary>
         /// <param name="filename">A file containing the spreadsheet to be loaded.</param>
         /// <param name="isValid">A delegate used to impose additional constraints on cell names.</param>
@@ -88,7 +92,7 @@ namespace SS
                     string tempCellName = null;
 
                     // stores the value of a <contents> tag
-                    // is reset to null once the name is used to create a new cell
+                    // is reset to null once the contents are used to create a new cell
                     string tempCellContents = null;
 
                     // This loop iterates through the start elements in the file.
@@ -258,20 +262,14 @@ namespace SS
 
         public override object GetCellContents(string name)
         {
-            // throws an InvalidNameException if necessary
             throwIfInvalidName(name);
 
             name = Normalize(name);
 
-            // if cell is not empty
             if (nonemptyCellsDict.TryGetValue(name, out Cell resultCell))
-            {
                 return resultCell.Contents;
-            }
             else
-            {
                 return "";
-            }
 
         }
 
@@ -431,18 +429,18 @@ namespace SS
         /// <param name="name"></param>
         private void throwIfInvalidName(string name)
         {
-            // check null
+            // error: name is null
             if (ReferenceEquals(name, null))
                 throw new InvalidNameException();
 
             name = Normalize(name);
 
-            // check general spreadsheet validity
+            // error: name does not pass general spreadsheet requirements
             string validNamePattern = @"^[a-zA-Z]+[0-9]+$";
             if (!Regex.IsMatch(name, validNamePattern))
                 throw new InvalidNameException();
 
-            // check specific Validator validity
+            // error: name does not pass specific Validator requirements
             if (!IsValid(name))
                 throw new InvalidNameException();
         }

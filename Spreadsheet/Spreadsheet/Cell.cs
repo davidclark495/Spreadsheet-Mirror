@@ -15,12 +15,23 @@ namespace SpreadsheetUtilities
     /// </summary>
     internal class Cell
     {
-        // Stores a Double, String, or Formula representing the user-entered data for the cell.
+        /// <summary>
+        /// Stores a Double, String, or Formula representing the user-entered data for the cell.
+        /// The private member behind Contents.
+        /// </summary>
         private object p_contents;
-        // Stores a Double, String, or FormulaError derived from evaluating the cell's contents.
-        private object p_value;
 
-        // This delegate is used to evaluate Formulas.
+        /// <summary>
+        /// Stores a Double, String, or FormulaError derived from evaluating the cell's contents.
+        /// The private member behind Value.
+        /// </summary>
+        private object p_value;
+        
+        /// <summary>
+        /// This delegate is used to evaluate Formulas.
+        /// Cells are meant to be mutable, so every Cell needs a lookup delegate
+        /// in case it's contents are set to a Formula object.
+        /// </summary>
         private Func<string, double> lookup;
 
         /// <summary>
@@ -50,7 +61,6 @@ namespace SpreadsheetUtilities
         }
 
         /// <summary>
-        /// The public-facing property for p_contents.
         /// Represents a Double, String, or Formula.
         /// Resetting a Cell's "Contents" will cause it to recalculate its value.
         /// </summary>
@@ -72,7 +82,9 @@ namespace SpreadsheetUtilities
         }
 
         /// <summary>
-        /// The public-facing property for p_value.
+        /// The value of the cell.
+        /// Represents a Double, String, or FormulaError.
+        /// Derived from the cell's Contents.
         /// </summary>
         public object Value
         {
