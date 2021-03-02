@@ -79,74 +79,30 @@ namespace SS
             {
                 using (XmlReader reader = XmlReader.Create(filename))
                 {
-                    // tracks the most recently encountered <name> element
-                    // used when the next <contents> element is found to create a new cell
-                    string tempCellName = null;
-
-                    // must be equal to the Version property, defined by the "version" parameter 
-                    string savedVersion = null;
-
-                    // tracks the most recently encountered start element 
-                    // used to detect if a necessary element was skipped over
-                    string prevStartElement = null;
-
-                    //while (reader.Read())
-                    //{
-                    //    if (reader.IsStartElement())
-                    //    {
-                    //        switch (reader.Name)
-                    //        {
-                    //            case "spreadsheet":
-                    //                savedVersion = reader["version"];
-                    //                break;
-
-                    //            case "cell":
-                    //                // a new <cell> element can only follow a <spreadsheet> or <contents> declaration
-                    //                // this ignores ending tags such as </cell>
-                    //                if (prevStartElement != "spreadsheet" && prevStartElement != "contents")
-                    //                {
-                    //                    throw new SpreadsheetReadWriteException("The file contains misplaced tags " +
-                    //                        "and could not be read.");
-                    //                }
-                    //                break;
-
-                    //            case "name":
-                    //                reader.Read();
-                    //                tempCellName = reader.Value;
-                    //                try { throwIfInvalidName(tempCellName); }
-                    //                catch (InvalidNameException)
-                    //                {
-                    //                    throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
-                    //                        "a cell with an invalid name: " + tempCellName);
-                    //                }
-                    //                break;
-
-                    //            case "contents":
-                    //                reader.Read();
-                    //                try { SetContentsOfCell(tempCellName, reader.Value); }
-                    //                catch (CircularException)
-                    //                {
-                    //                    throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
-                    //                        "a cycle.");
-                    //                }
-                    //                break;
-                    //        }
-                    //        prevStartElement = reader.Name;
-                    //    }
-                    //}
                     while (reader.Read())
                     {
+                        // handle <spreadsheet> and version info.
                         if (reader.IsStartElement() && reader.Name == "spreadsheet")
                         {
-                            savedVersion = reader["version"];
+                            if (this.Version != reader["version"])
+                                throw new SpreadsheetReadWriteException("The saved spreadsheet's version information " +
+                                    "does not match the provided version information.");
                         }
+
+                        // handle <cell>, <name>, and <content> in sequence
                         else if (reader.IsStartElement() && reader.Name == "cell")
                         {
-                            // move the reader along until the <name> element is found
-                            while (reader.Read() && !(reader.IsStartElement() && reader.Name == "name")) { }
+                            // move the reader along until the next element is found
+                            while (reader.Read() && !(reader.IsStartElement())) { }
+                            
+                            // tag sequence error: next element is not <name>
+                            if (reader.Name != "name")
+                                throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
+                                    "a cell without a name.");
 
+                            // read and error-check the <name> element
                             reader.Read();
-                            tempCellName = reader.Value;
+                            string tempCellName = reader.Value;
                             try { throwIfInvalidName(tempCellName); }
                             catch (InvalidNameException)
                             {
@@ -154,9 +110,15 @@ namespace SS
                                     "a cell with an invalid name: " + tempCellName);
                             }
 
-                            // move the reader along until the <contents> element is found
-                            while (reader.Read() && !(reader.IsStartElement() && reader.Name == "contents")) { }
+                            // move the reader along until the next element is found
+                            while (reader.Read() && !(reader.IsStartElement())) { }
 
+                            // tag sequence error: next element is not <contents>
+                            if (reader.Name != "contents")
+                                throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
+                                    "a cell without contents.");
+
+                            // read the <contents> element and create the new Cell
                             reader.Read();
                             try { SetContentsOfCell(tempCellName, reader.Value); }
                             catch (CircularException)
@@ -166,9 +128,6 @@ namespace SS
                             }
                         }
                     }
-                    if (this.Version != savedVersion)
-                        throw new SpreadsheetReadWriteException("The saved spreadsheet's version information " +
-                            "does not match the provided version information.");
                 }
             }
             catch (Exception)
