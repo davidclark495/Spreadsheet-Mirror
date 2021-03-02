@@ -487,6 +487,37 @@ namespace SpreadsheetTests
 
         /// <summary>
         /// Tests the four-argument constructor.
+        /// Requires an exception when loading a file with poorly written "cell" tags.
+        /// </summary>
+        [TestMethod]
+        [ExpectedException(typeof(SpreadsheetReadWriteException))]
+        public void Load_InvalidSave_CellWithTwoNames()
+        {
+            XmlWriterSettings settings = new XmlWriterSettings();
+            settings.Indent = true;
+            settings.IndentChars = "  ";
+
+            using (XmlWriter writer = XmlWriter.Create("InvalidSave.xml", settings))
+            {
+                writer.WriteStartDocument();
+                writer.WriteStartElement("spreadsheet");
+                writer.WriteAttributeString("version", "default");
+
+                writer.WriteStartElement("cell");
+                writer.WriteElementString("name", "A1");
+                writer.WriteElementString("name", "A5");
+                writer.WriteElementString("contents", "string of contents");
+                writer.WriteEndElement();
+
+                writer.WriteEndElement();
+                writer.WriteEndDocument();
+            }
+
+            SS.Spreadsheet loadedSpreadsheet = new SS.Spreadsheet("InvalidSave.xml", s => true, s => s, "default");
+        }
+
+        /// <summary>
+        /// Tests the four-argument constructor.
         /// Requires an exception when loading a file with incomplete "cell" tags.
         /// This method tests the event where the saved spreadsheet contains a single cell,
         /// and this cell's name does not meet the spreadsheet's basic requirements.
@@ -548,7 +579,103 @@ namespace SpreadsheetTests
             SS.Spreadsheet loadedSpreadsheet = new SS.Spreadsheet("InvalidSave.xml", s => true, s => s, "default");
         }
 
-        
+        /// <summary>
+        /// Tests the four-argument constructor.
+        /// Requires an exception when loading a file with poorly written "cell" tags.
+        /// </summary>
+        [TestMethod]
+        [ExpectedException(typeof(SpreadsheetReadWriteException))]
+        public void Load_InvalidSave_CellWithTwoContents()
+        {
+            XmlWriterSettings settings = new XmlWriterSettings();
+            settings.Indent = true;
+            settings.IndentChars = "  ";
+
+            using (XmlWriter writer = XmlWriter.Create("InvalidSave.xml", settings))
+            {
+                writer.WriteStartDocument();
+                writer.WriteStartElement("spreadsheet");
+                writer.WriteAttributeString("version", "default");
+
+                writer.WriteStartElement("cell");
+                writer.WriteElementString("name", "A1");
+                writer.WriteElementString("contents", "string of contents");
+                writer.WriteElementString("contents", "another string of contents");
+                writer.WriteEndElement();
+
+                writer.WriteEndElement();
+                writer.WriteEndDocument();
+            }
+
+            SS.Spreadsheet loadedSpreadsheet = new SS.Spreadsheet("InvalidSave.xml", s => true, s => s, "default");
+        }
+
+        /// <summary>
+        /// Tests the four-argument constructor.
+        /// Requires an exception when loading a file with nested "cell" tags.
+        /// </summary>
+        [TestMethod]
+        [ExpectedException(typeof(SpreadsheetReadWriteException))]
+        public void Load_InvalidSave_NestedCells()
+        {
+            XmlWriterSettings settings = new XmlWriterSettings();
+            settings.Indent = true;
+            settings.IndentChars = "  ";
+
+            using (XmlWriter writer = XmlWriter.Create("InvalidSave.xml", settings))
+            {
+                writer.WriteStartDocument();
+                writer.WriteStartElement("spreadsheet");
+                writer.WriteAttributeString("version", "default");
+
+
+                writer.WriteStartElement("cell");
+
+                writer.WriteStartElement("cell");
+                writer.WriteElementString("name", "Z1");
+                writer.WriteElementString("contents", "inner contents");
+                writer.WriteEndElement();
+
+                writer.WriteElementString("name", "A1");
+                writer.WriteElementString("contents", "string of contents");
+                writer.WriteEndElement();
+
+
+                writer.WriteEndElement();
+                writer.WriteEndDocument();
+            }
+
+            SS.Spreadsheet loadedSpreadsheet = new SS.Spreadsheet("InvalidSave.xml", s => true, s => s, "default");
+        }
+
+        /// <summary>
+        /// Tests the four-argument constructor.
+        /// Requires an exception when loading a file with "name" and "contents" tags outside of a cell.
+        /// </summary>
+        [TestMethod]
+        [ExpectedException(typeof(SpreadsheetReadWriteException))]
+        public void Load_InvalidSave_MissingCellTag()
+        {
+            XmlWriterSettings settings = new XmlWriterSettings();
+            settings.Indent = true;
+            settings.IndentChars = "  ";
+
+            using (XmlWriter writer = XmlWriter.Create("InvalidSave.xml", settings))
+            {
+                writer.WriteStartDocument();
+                writer.WriteStartElement("spreadsheet");
+                writer.WriteAttributeString("version", "default");
+
+                writer.WriteElementString("name", "A1");
+                writer.WriteElementString("contents", "string of contents");
+
+                writer.WriteEndElement();
+                writer.WriteEndDocument();
+            }
+
+            SS.Spreadsheet loadedSpreadsheet = new SS.Spreadsheet("InvalidSave.xml", s => true, s => s, "default");
+        }
+
         /// <summary>
         /// Tests the four-argument constructor.
         /// Requires an exception when loading a file containing cells with circular dependencies.
@@ -665,7 +792,7 @@ namespace SpreadsheetTests
             spreadsheet.SetContentsOfCell("A1", null);
         }
 
-
+        
 
 
         // ---------- My PS4 Tests (with modifications) ----------
