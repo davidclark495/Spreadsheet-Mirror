@@ -39,7 +39,7 @@ namespace SpreadsheetUtilities
         /// Generates the value associated with the Cell's contents. 
         /// Should be called whenever the contents are reset.
         /// </summary>
-        private void RecalculateValue()
+        public void RecalculateValue()
         {
             if (Contents is Double)
                 Value = (Double)Contents;

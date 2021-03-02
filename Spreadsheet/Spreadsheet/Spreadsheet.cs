@@ -39,14 +39,24 @@ namespace SS
 
 
 
-
-        public Spreadsheet() : base(s => true, s => s, "default")
+        /// <summary>
+        /// Invokes the three-argument constructor. 
+        /// The resulting spreadsheet will have:
+        /// ...a validator that always accepts a given cell name (although the name may be rejected for other reasons)
+        /// ...a normalize delegate that doesn't modify incoming names
+        /// ...the "default" version setting
+        /// </summary>
+        public Spreadsheet()
+            : this(s => true, s => s, "default")
         {
-            depGraph = new DependencyGraph();
-            nonemptyCellsDict = new Dictionary<string, Cell>();
-            Changed = false;
         }
 
+        /// <summary>
+        /// Creates a new Spreadsheet object with the provided delegates and version information.
+        /// </summary>
+        /// <param name="isValid">A delegate used to impose additional constraints on cell names.</param>
+        /// <param name="normalize">A delegate used to standardize cell names.</param>
+        /// <param name="version">A string to determine version compatibility, used when saving or loading.</param>
         public Spreadsheet(Func<string, bool> isValid, Func<string, string> normalize, string version)
             : base(isValid, normalize, version)
         {
@@ -55,64 +65,111 @@ namespace SS
             Changed = false;
         }
 
+        /// <summary>
+        /// Invokes the three-argument constructor, then populates the spreadsheet with data read from the given file.
+        /// </summary>
+        /// <param name="filename">A file containing the spreadsheet to be loaded.</param>
+        /// <param name="isValid">A delegate used to impose additional constraints on cell names.</param>
+        /// <param name="normalize">A delegate used to standardize cell names.</param>
+        /// <param name="version">A string to determine version compatibility, used when saving or loading.</param>
         public Spreadsheet(string filename, Func<string, bool> isValid, Func<string, string> normalize, string version)
-            : base(isValid, normalize, version)
+            : this(isValid, normalize, version)
         {
-            depGraph = new DependencyGraph();
-            nonemptyCellsDict = new Dictionary<string, Cell>();
-            Changed = false;
-
-            // load the file
             try
             {
                 using (XmlReader reader = XmlReader.Create(filename))
                 {
+                    // tracks the most recently encountered <name> element
+                    // used when the next <contents> element is found to create a new cell
                     string tempCellName = null;
-                    string tempCellContents = null;
+
+                    // must be equal to the Version property, defined by the "version" parameter 
+                    string savedVersion = null;
+
+                    // tracks the most recently encountered start element 
+                    // used to detect if a necessary element was skipped over
+                    string prevStartElement = null;
+
+                    //while (reader.Read())
+                    //{
+                    //    if (reader.IsStartElement())
+                    //    {
+                    //        switch (reader.Name)
+                    //        {
+                    //            case "spreadsheet":
+                    //                savedVersion = reader["version"];
+                    //                break;
+
+                    //            case "cell":
+                    //                // a new <cell> element can only follow a <spreadsheet> or <contents> declaration
+                    //                // this ignores ending tags such as </cell>
+                    //                if (prevStartElement != "spreadsheet" && prevStartElement != "contents")
+                    //                {
+                    //                    throw new SpreadsheetReadWriteException("The file contains misplaced tags " +
+                    //                        "and could not be read.");
+                    //                }
+                    //                break;
+
+                    //            case "name":
+                    //                reader.Read();
+                    //                tempCellName = reader.Value;
+                    //                try { throwIfInvalidName(tempCellName); }
+                    //                catch (InvalidNameException)
+                    //                {
+                    //                    throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
+                    //                        "a cell with an invalid name: " + tempCellName);
+                    //                }
+                    //                break;
+
+                    //            case "contents":
+                    //                reader.Read();
+                    //                try { SetContentsOfCell(tempCellName, reader.Value); }
+                    //                catch (CircularException)
+                    //                {
+                    //                    throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
+                    //                        "a cycle.");
+                    //                }
+                    //                break;
+                    //        }
+                    //        prevStartElement = reader.Name;
+                    //    }
+                    //}
                     while (reader.Read())
                     {
-                        if (reader.IsStartElement())
+                        if (reader.IsStartElement() && reader.Name == "spreadsheet")
                         {
-                            switch (reader.Name)
+                            savedVersion = reader["version"];
+                        }
+                        else if (reader.IsStartElement() && reader.Name == "cell")
+                        {
+                            // move the reader along until the <name> element is found
+                            while (reader.Read() && !(reader.IsStartElement() && reader.Name == "name")) { }
+
+                            reader.Read();
+                            tempCellName = reader.Value;
+                            try { throwIfInvalidName(tempCellName); }
+                            catch (InvalidNameException)
                             {
-                                case "spreadsheet":
-                                    if (this.Version != reader["version"])
-                                        throw new SpreadsheetReadWriteException("The saved spreadsheet's version information " +
-                                            "does not match the provided version information.");
-                                    break;
+                                throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
+                                    "a cell with an invalid name: " + tempCellName);
+                            }
 
-                                case "cell":
-                                    break;
+                            // move the reader along until the <contents> element is found
+                            while (reader.Read() && !(reader.IsStartElement() && reader.Name == "contents")) { }
 
-                                case "name":
-                                    reader.Read();
-                                    tempCellName = reader.Value;
-                                    try { throwIfInvalidName(tempCellName); }
-                                    catch (InvalidNameException)
-                                    {
-                                        throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
-                                            "a cell with an invalid name: " + tempCellName);
-                                    }
-                                    break;
-
-                                case "contents":
-                                    reader.Read();
-                                    tempCellContents = reader.Value;
-                                    try { SetContentsOfCell(tempCellName, tempCellContents); }
-                                    catch (CircularException)
-                                    {
-                                        throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
-                                            "a cycle.");
-                                    }
-                                    break;
+                            reader.Read();
+                            try { SetContentsOfCell(tempCellName, reader.Value); }
+                            catch (CircularException)
+                            {
+                                throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
+                                    "a cycle.");
                             }
                         }
                     }
+                    if (this.Version != savedVersion)
+                        throw new SpreadsheetReadWriteException("The saved spreadsheet's version information " +
+                            "does not match the provided version information.");
                 }
-            }
-            catch (System.IO.FileNotFoundException)
-            {
-                throw new SpreadsheetReadWriteException("The file could not be found: " + filename);
             }
             catch (Exception)
             {
@@ -128,23 +185,21 @@ namespace SS
                 {
                     while (reader.Read())
                     {
-                        if (reader.IsStartElement() && reader.Name == "spreadsheet")
+                        if (reader.IsStartElement() &&
+                            reader.Name == "spreadsheet" &&
+                            !ReferenceEquals(reader["version"], null))
                         {
                             return reader["version"];
                         }
                     }
                 }
 
-                // This line should never be executed when reading a correctly written save file.
-                return null;
+                throw new SpreadsheetReadWriteException("The file is improperly written. " +
+                    "It does not contain any version information.");
             }
             catch (ArgumentNullException)
             {
                 throw new SpreadsheetReadWriteException("File name cannot be null");
-            }
-            catch (System.IO.FileNotFoundException)
-            {
-                throw new SpreadsheetReadWriteException("The file could not be found: " + filename);
             }
             catch (Exception)
             {
@@ -161,31 +216,38 @@ namespace SS
             settings.Indent = true;
             settings.IndentChars = "  ";
 
-            using (XmlWriter writer = XmlWriter.Create(filename, settings))
+            try
             {
-                writer.WriteStartDocument();
-                writer.WriteStartElement("spreadsheet");
-                writer.WriteAttributeString("version", this.Version);
-
-                foreach (string tempCellName in GetNamesOfAllNonemptyCells())
+                using (XmlWriter writer = XmlWriter.Create(filename, settings))
                 {
-                    // this should never return false
-                    nonemptyCellsDict.TryGetValue(tempCellName, out Cell tempCell);
+                    writer.WriteStartDocument();
+                    writer.WriteStartElement("spreadsheet");
+                    writer.WriteAttributeString("version", this.Version);
 
-                    writer.WriteStartElement("cell");
-                    writer.WriteElementString("name", tempCellName);
-                    writer.WriteStartElement("contents");
-                    if (tempCell.Contents is Double)
-                        writer.WriteValue(((double)tempCell.Contents).ToString());
-                    else if (tempCell.Contents is Formula)
-                        writer.WriteValue("=" + ((Formula)tempCell.Contents).ToString());
-                    else if (tempCell.Contents is String)
-                        writer.WriteValue((string)tempCell.Contents);
-                    writer.WriteEndElement();// ends "contents" element
-                    writer.WriteEndElement();// ends "cell" element
+                    foreach (string tempCellName in GetNamesOfAllNonemptyCells())
+                    {
+                        // this should never return false
+                        nonemptyCellsDict.TryGetValue(tempCellName, out Cell tempCell);
+
+                        writer.WriteStartElement("cell");
+                        writer.WriteElementString("name", tempCellName);
+                        writer.WriteStartElement("contents");
+                        if (tempCell.Contents is Double)
+                            writer.WriteValue(((double)tempCell.Contents).ToString());
+                        else if (tempCell.Contents is Formula)
+                            writer.WriteValue("=" + ((Formula)tempCell.Contents).ToString());
+                        else if (tempCell.Contents is String)
+                            writer.WriteValue((string)tempCell.Contents);
+                        writer.WriteEndElement();// ends "contents" element
+                        writer.WriteEndElement();// ends "cell" element
+                    }
+                    writer.WriteEndElement();// ends "spreadsheet" element
+                    writer.WriteEndDocument();
                 }
-                writer.WriteEndElement();// ends "spreadsheet" element
-                writer.WriteEndDocument();
+            }
+            catch (Exception)
+            {
+                throw new SpreadsheetReadWriteException("The spreadsheet could not be saved to the provided file location.");
             }
 
             Changed = false;
@@ -238,15 +300,26 @@ namespace SS
             name = Normalize(name);
             Changed = true;
 
+            IList<string> returnList;
 
+            // set the value of the cell
             if (Double.TryParse(content, out double contentAsDouble))
-                return SetCellContents(name, contentAsDouble);
-            
+                returnList = SetCellContents(name, contentAsDouble);
+
             else if (content.StartsWith("="))
-                return SetCellContents(name, new Formula(content.Substring(1), Normalize, IsValid));
-            
-            else 
-                return SetCellContents(name, content);
+                returnList = SetCellContents(name, new Formula(content.Substring(1), Normalize, IsValid));
+
+            else
+                returnList = SetCellContents(name, content);
+
+            // update the values of each of the cell's direct/indirect dependents
+            foreach (string cellName in returnList)
+            {
+                if (nonemptyCellsDict.TryGetValue(cellName, out Cell dependent))
+                    dependent.RecalculateValue();
+            }
+
+            return returnList;
         }
 
         protected override IList<string> SetCellContents(string name, double number)
@@ -284,11 +357,12 @@ namespace SS
         protected override IList<string> SetCellContents(string name, Formula formula)
         {
             // replaces the Cell's contents and creates a backup, or creates a new cell
-            Object originalCellContents = null;
-            if (nonemptyCellsDict.TryGetValue(name, out Cell cellToReset))
+            Cell originalCell = null;
+            Object originalContentsBackup = null;
+            if (nonemptyCellsDict.TryGetValue(name, out originalCell))
             {
-                originalCellContents = cellToReset.Contents;
-                cellToReset.Contents = formula;
+                originalContentsBackup = originalCell.Contents;
+                originalCell.Contents = formula;
             }
             else
                 nonemptyCellsDict.Add(name, new Cell(formula, this.Lookup));
@@ -298,13 +372,20 @@ namespace SS
             depGraph.ReplaceDependees(name, formula.GetVariables());
 
             // returns the list of self + direct/indirect dependents, or detects a Circular Exception and resets
-            try
+            try // return the list as expected
             {
                 return GetListToRecalculate(name);
             }
-            catch (CircularException e)
-            {
-                cellToReset.Contents = originalCellContents;
+            catch (CircularException e) // a Circular dependency was introduced --> revert the Cell, then throw the exception
+            { 
+                // if the cell was previously nonempty, then restore the cell's contents
+                // else the cell was empty, remove it from the non-empty dictionary
+                if (!ReferenceEquals(originalCell, null))
+                    originalCell.Contents = originalContentsBackup;
+                else
+                    nonemptyCellsDict.Remove(name);
+
+                // restore the cell's original dependencies
                 depGraph.ReplaceDependees(name, originalDependees);
 
                 throw e;
@@ -326,23 +407,18 @@ namespace SS
         ///     ...the cell's value is not a double.
         /// Exceptions should be caught when evaluating a Formula.
         /// </summary>
-        /// <param name="name"></param>
-        /// <returns></returns>
+        /// <param name="name">a cell/variable name</param>
+        /// <returns>the double value associated with the given cell/variable</returns>
         private double Lookup(string name)
         {
-            throwIfInvalidName(name);
-
-            name = Normalize(name);
-
-            nonemptyCellsDict.TryGetValue(name, out Cell cell);
-
-            if (ReferenceEquals(cell, null))
-                throw new ArgumentException("The cell being referenced is empty and can't be evaluated in a Formula.");
-
-            if (!(cell.Value is double))
-                throw new ArgumentException("The cell being referenced could not be evaluated to a number.");
-
-            return (double)cell.Value;
+            try
+            {
+                return (double)GetCellValue(name);
+            }
+            catch (Exception)
+            {
+                throw new ArgumentException("The variable '" + name + "' could not be evaluated.");
+            }
         }
 
         /// <summary>
