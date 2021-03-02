@@ -79,55 +79,97 @@ namespace SS
             {
                 using (XmlReader reader = XmlReader.Create(filename))
                 {
+                    // true after an opening <cell> tag has been read
+                    // false after reading <name> and <contents> elements
+                    bool unresolvedCell = false;
+
+                    // stores the value of a <name> tag
+                    // is reset to null once the name is used to create a new cell
+                    string tempCellName = null;
+
+                    // stores the value of a <contents> tag
+                    // is reset to null once the name is used to create a new cell
+                    string tempCellContents = null;
+
+                    // This loop iterates through the start elements in the file.
+                    // If it encounters a <name> or <contents> element, it stores the value to be processed later.
+                    // After processing an element, it checks to see if it has enough information to 
+                    // create a new Cell. 
+                    // If it does, it resets the "unresolvedCell," "tempCellName," and "tempCellContents" to 
+                    // show that the <cell>, <name>, and <contents> tags have all been closed, and a new cell can begin.
                     while (reader.Read())
                     {
-                        // handle <spreadsheet> and version info.
-                        if (reader.IsStartElement() && reader.Name == "spreadsheet")
+                        if (reader.IsStartElement())
                         {
-                            if (this.Version != reader["version"])
-                                throw new SpreadsheetReadWriteException("The saved spreadsheet's version information " +
-                                    "does not match the provided version information.");
-                        }
-
-                        // handle <cell>, <name>, and <content> in sequence
-                        else if (reader.IsStartElement() && reader.Name == "cell")
-                        {
-                            // move the reader along until the next element is found
-                            while (reader.Read() && !(reader.IsStartElement())) { }
-                            
-                            // tag sequence error: next element is not <name>
-                            if (reader.Name != "name")
-                                throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
-                                    "a cell without a name.");
-
-                            // read and error-check the <name> element
-                            reader.Read();
-                            string tempCellName = reader.Value;
-                            try { throwIfInvalidName(tempCellName); }
-                            catch (InvalidNameException)
+                            switch (reader.Name)
                             {
-                                throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
-                                    "a cell with an invalid name: " + tempCellName);
+                                case "spreadsheet":
+                                    if (this.Version != reader["version"])
+                                        throw new SpreadsheetReadWriteException("The saved spreadsheet's version information " +
+                                            "does not match the provided version information.");
+                                    break;
+
+                                case "cell":
+                                    // error: can't start a new <cell> element before resolving a previous <cell>
+                                    if (unresolvedCell)
+                                        throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
+                                            "incomplete cell descriptions.");
+                                    // set a marker for following iterations
+                                    unresolvedCell = true;
+                                    break;
+
+                                case "name":
+                                    // error: <name> must be be used inside an enclosing cell
+                                    // error: <name> can only appear once inside a cell
+                                    if(!unresolvedCell || tempCellName != null)
+                                        throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
+                                            "incomplete cell descriptions.");
+
+                                    reader.Read();
+                                    tempCellName = reader.Value;
+                                    try { throwIfInvalidName(tempCellName); }
+                                    catch (InvalidNameException)
+                                    {
+                                        throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
+                                            "a cell with an invalid name: " + tempCellName);
+                                    }
+                                    break;
+
+                                case "contents":
+                                    // error: <contents> must be be used inside an enclosing cell
+                                    // error: <contents> can only appear once inside a cell
+                                    if (!unresolvedCell || tempCellContents != null)
+                                        throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
+                                            "incomplete cell descriptions.");
+
+                                    reader.Read();
+                                    tempCellContents = reader.Value;
+                                    break;
                             }
 
-                            // move the reader along until the next element is found
-                            while (reader.Read() && !(reader.IsStartElement())) { }
-
-                            // tag sequence error: next element is not <contents>
-                            if (reader.Name != "contents")
-                                throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
-                                    "a cell without contents.");
-
-                            // read the <contents> element and create the new Cell
-                            reader.Read();
-                            try { SetContentsOfCell(tempCellName, reader.Value); }
-                            catch (CircularException)
+                            // after evaluating a new start element
+                            // check the conditions for adding a new cell
+                            if (unresolvedCell && tempCellName != null && tempCellContents != null)
                             {
-                                throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
-                                    "a cycle.");
+                                try
+                                {
+                                    SetContentsOfCell(tempCellName, tempCellContents);                                }
+                                catch (CircularException)
+                                {
+                                    throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
+                                        "a cycle.");
+                                }
+                                unresolvedCell = false;
+                                tempCellName = null;
+                                tempCellContents = null;
                             }
                         }
                     }
+
+                    // once the file has been processed, all <cell> tags must have been resolved
+                    if (unresolvedCell)
+                        throw new SpreadsheetReadWriteException("The saved spreadsheet contains " +
+                                             "incomplete cell descriptions.");
                 }
             }
             catch (Exception)
