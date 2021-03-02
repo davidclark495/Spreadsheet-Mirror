@@ -452,7 +452,7 @@ namespace SpreadsheetTests
             SS.Spreadsheet loadedSpreadsheet = new SS.Spreadsheet("InvalidSave.xml", s => true, s => s, "default");
         }
 
-        
+
 
         /// <summary>
         /// Tests the four-argument constructor.
@@ -792,7 +792,87 @@ namespace SpreadsheetTests
             spreadsheet.SetContentsOfCell("A1", null);
         }
 
-        
+        /// <summary>
+        /// Tests the four-argument constructor.
+        /// Requires that the spreadsheet can load with large numbers of cells.
+        /// </summary>
+        [TestMethod]
+        public void Load_LargeFile()
+        {
+            int numCells = 1000;
+
+            XmlWriterSettings settings = new XmlWriterSettings();
+            settings.Indent = true;
+            settings.IndentChars = "  ";
+
+            using (XmlWriter writer = XmlWriter.Create("save.xml", settings))
+            {
+                writer.WriteStartDocument();
+                writer.WriteStartElement("spreadsheet");
+                writer.WriteAttributeString("version", "default");
+
+                for (int i = 1; i <= numCells; i++)
+                {
+                    writer.WriteStartElement("cell");
+                    writer.WriteElementString("name", "A" + i);
+                    writer.WriteElementString("contents", "" + i);
+                    writer.WriteEndElement();
+                }
+
+                writer.WriteEndElement();
+                writer.WriteEndDocument();
+            }
+
+            SS.Spreadsheet loadedSpreadsheet = new SS.Spreadsheet("save.xml", s => true, s => s, "default");
+
+            for (int i = 1; i <= numCells; i++)
+            {
+                Assert.AreEqual((double)i, (double)loadedSpreadsheet.GetCellValue("A" + i), 1e-9);
+            }
+        }
+
+        /// <summary>
+        /// Tests the four-argument constructor.
+        /// Requires that the spreadsheet can load with large numbers of cells.
+        /// </summary>
+        [TestMethod]
+        public void Load_LargeFile_DependencyChain()
+        {
+            int numCells = 100;
+
+            XmlWriterSettings settings = new XmlWriterSettings();
+            settings.Indent = true;
+            settings.IndentChars = "  ";
+
+            using (XmlWriter writer = XmlWriter.Create("save.xml", settings))
+            {
+                writer.WriteStartDocument();
+                writer.WriteStartElement("spreadsheet");
+                writer.WriteAttributeString("version", "default");
+
+                for (int i = 1; i <= numCells; i++)
+                {
+                    writer.WriteStartElement("cell");
+                    writer.WriteElementString("name", "A" + i);
+                    writer.WriteElementString("contents", "=A" + (i + 1) + " - 1");
+                    writer.WriteEndElement();
+                }
+                writer.WriteStartElement("cell");
+                writer.WriteElementString("name", "A" + (numCells + 1));
+                writer.WriteElementString("contents", "=" + (numCells + 1));
+                writer.WriteEndElement();
+
+                writer.WriteEndElement();
+                writer.WriteEndDocument();
+            }
+
+            SS.Spreadsheet loadedSpreadsheet = new SS.Spreadsheet("save.xml", s => true, s => s, "default");
+
+            for (int i = 1; i <= numCells; i++)
+            {
+                Assert.AreEqual((double)i, (double)loadedSpreadsheet.GetCellValue("A" + i), 1e-9);
+            }
+        }
 
 
         // ---------- My PS4 Tests (with modifications) ----------
